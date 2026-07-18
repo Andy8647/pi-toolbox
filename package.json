@@ -1,0 +1,19 @@
+{
+  "name": "pi-toolbox",
+  "version": "0.1.0",
+  "description": "Rounded transparent tool boxes with bash syntax highlighting and status-aware border colors for pi coding agent",
+  "keywords": ["pi-package", "pi-extension"],
+  "license": "MIT",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Andy8647/pi-toolbox"
+  }
+}
