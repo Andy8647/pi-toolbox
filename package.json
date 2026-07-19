@@ -1,5 +1,5 @@
 {
-  "name": "pi-toolbox",
+  "name": "@andy8647/pi-toolbox",
   "version": "0.1.0",
   "description": "Rounded transparent tool boxes with bash syntax highlighting and status-aware border colors for pi coding agent",
   "keywords": ["pi-package", "pi-extension"],
