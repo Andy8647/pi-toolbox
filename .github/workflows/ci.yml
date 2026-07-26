@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      # The published tarball is the extension source itself — make sure the
+      # files pi loads are actually in it.
+      - name: Verify package contents
+        run: |
+          pnpm pack --pack-destination /tmp >/dev/null
+          TARBALL=$(ls /tmp/*pi-toolbox-*.tgz | head -1)
+          echo "packed: $TARBALL"
+          tar -tzf "$TARBALL" | sort
+          for f in package/index.ts package/frame.ts package/click.ts package/bash-highlight.ts package/config.ts package/theme-access.ts package/README.md; do
+            tar -tzf "$TARBALL" | grep -qx "$f" || { echo "::error::$f missing from tarball"; exit 1; }
+          done
