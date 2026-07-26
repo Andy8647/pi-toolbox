@@ -8,7 +8,6 @@ Rounded transparent tool boxes with syntax highlighting for [pi](https://github.
 - **Every tool box** — built-in tools, MCP calls (pi-mcp-adapter), subagents, and any other extension's tools all get the same frame
 - **Transparent background** — no solid background fill, works with terminal transparency
 - **Status-aware border colors** — grey while executing, green on success, red on error
-- **Click to expand one box** (opt-in) — click any tool box to expand/collapse just that one; `ctrl+o` still toggles all of them
 - **Bash syntax highlighting** — commands get token-level coloring (commands, flags, strings, variables, operators, etc.)
 - **Scroll-safe caching** — content fingerprint caching prevents re-rendering on every scroll event
 
@@ -45,8 +44,7 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
 {
   "toolbox": {
     "enabled": true,
-    "highlightBash": true,
-    "clickToExpand": true
+    "highlightBash": true
   }
 }
 ```
@@ -55,31 +53,6 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
 |-----|------|---------|-------------|
 | `enabled` | boolean | `true` | Enable/disable the extension |
 | `highlightBash` | boolean | `true` | Syntax-highlight bash commands |
-| `clickToExpand` | boolean | `false` | Click a tool box to expand only that box (see below) |
-
-### About click-to-expand
-
-Off by default, because it takes the mouse away from the terminal for the whole
-session. pi does not enable mouse reporting on its own, so this extension turns
-on SGR mouse tracking (`?1000` + `?1006`) and consumes the reports before they
-reach the editor. While it is on, the terminal routes clicks and the scroll
-wheel to pi instead of handling them itself:
-
-- **Hold Shift** for native text selection and scrollback wheel scrolling
-  (works in Ghostty, iTerm2, WezTerm, Kitty, and most modern terminals).
-- Mouse tracking is disabled again on shutdown.
-
-**It cannot work alongside an extension that already owns the mouse.**
-[pi-powerline-footer](https://github.com/Andy8647/pi-powerline-footer)'s
-fixed-editor compositor (`fixedEditor`, on by default) enables `?1002h` and
-consumes *every* SGR mouse report for its own scrolling and selection, so no
-click ever reaches this extension. pi-toolbox detects that setup and stands
-down instead of enabling a second, competing mouse mode — click-to-expand there
-has to live inside the compositor.
-
-Set `PI_TOOLBOX_DEBUG=1` to trace mouse handling to
-`~/.pi/agent/pi-toolbox-debug.log` (whether reports arrive, which line a click
-maps to, and which component was hit).
 
 ## How it works
 
@@ -88,6 +61,21 @@ registered the tool. The extension API cannot wrap another extension's
 renderers, so pi-toolbox patches that component's `render` instead — which is
 why MCP and subagent boxes are framed too. Only `bash` is re-registered, purely
 to add syntax highlighting to the command row.
+
+An unchanged box returns its cached line array outright, because a compositor
+like [pi-powerline-footer](https://github.com/Andy8647/pi-powerline-footer)'s
+fixed editor re-renders the whole root on every mouse packet while scrolling.
+Measured against unpatched pi at 300 boxes / 2400 lines: +0.03 ms per full
+render.
+
+### No mouse handling
+
+Expanding a single box by clicking it was tried and removed. It requires
+turning on terminal mouse reporting, which takes the wheel and clicks away from
+the terminal for the entire session, and it cannot coexist with an extension
+that already owns the mouse — pi-powerline-footer's fixed-editor compositor
+consumes every SGR mouse report for its own scrolling and selection. Use
+`ctrl+o` to toggle tool output.
 
 ## Compatible themes
 

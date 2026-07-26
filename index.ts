@@ -4,19 +4,16 @@
  * - every tool box (built-in, MCP, other extensions) gets a self-drawn rounded
  *   frame with status-aware border colors and no background fill
  * - bash commands are syntax-highlighted
- * - clicking a box expands/collapses that box alone (ctrl+o still toggles all)
  *
  * Configuration (settings.json → "toolbox"):
  *   enabled: boolean        — enable/disable the extension (default: true)
  *   highlightBash: boolean  — syntax-highlight bash commands (default: true)
- *   clickToExpand: boolean  — mouse click expands a single box (default: true)
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { formatBashCallHighlighted } from "./bash-highlight.ts";
-import { disableMouse, enableClickToExpand } from "./click.ts";
 import { patchToolBoxFrames } from "./frame.ts";
 import { loadConfig } from "./config.ts";
 import type { ThemeLike } from "./theme-access.ts";
@@ -90,17 +87,4 @@ export default function (pi: ExtensionAPI): void {
     }
   }
 
-  if (config.clickToExpand) {
-    pi.on("session_start", (_event: unknown, ctx: any) => {
-      // Mouse tracking only makes sense against the interactive TUI; in print
-      // or RPC mode the reports would land in stdout as garbage.
-      if (ctx?.mode !== "tui") return;
-      try {
-        enableClickToExpand(ctx.ui);
-      } catch (error) {
-        console.debug("[pi-toolbox] click-to-expand setup failed:", error);
-      }
-    });
-    pi.on("session_shutdown", () => disableMouse());
-  }
 }

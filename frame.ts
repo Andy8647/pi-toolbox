@@ -13,7 +13,7 @@
  * patching the prototype reaches every tool box in the session.
  */
 
-import { Container, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { getTheme, type ThemeLike } from "./theme-access.ts";
 
@@ -73,83 +73,6 @@ function drawFrame(lines: string[], width: number, theme: ThemeLike, color: stri
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Child line ranges — where each component landed in the rendered buffer
-// ═══════════════════════════════════════════════════════════════════════════
-
-interface ChildRange {
-  child: { render(width: number): string[] };
-  start: number;
-  end: number;
-}
-
-// jiti loads extensions with moduleCache disabled, so a module can be
-// evaluated more than once within one extension. Shared state lives on
-// globalThis so every copy sees the same ranges and the same TUI.
-const STATE_KEY = Symbol.for("pi-toolbox:state");
-
-interface ToolboxState {
-  childRanges: WeakMap<object, ChildRange[]>;
-  tui?: any;
-}
-
-const state: ToolboxState = ((globalThis as Record<symbol, ToolboxState>)[STATE_KEY] ??= {
-  childRanges: new WeakMap<object, ChildRange[]>(),
-});
-
-/** The TUI that owns the tool boxes, captured from the components themselves. */
-export function getTui(): any {
-  return state.tui;
-}
-
-/**
- * Container.render, re-implemented so each child's line range within the
- * container's output is recorded. Ranges are relative to the container, and
- * nest — walk from the TUI root to turn a buffer line into a component.
- *
- * Only installed when click-to-expand is active: it allocates a range object
- * per child on every render of every container, which is pure overhead for
- * sessions that never click.
- */
-export function patchContainerRanges(): void {
-  const proto = Container.prototype as unknown as {
-    render(width: number): string[];
-    children: ChildRange["child"][];
-    __toolboxRanges?: boolean;
-  };
-  if (proto.__toolboxRanges) return;
-  proto.__toolboxRanges = true;
-
-  proto.render = function (width: number): string[] {
-    const lines: string[] = [];
-    const ranges: ChildRange[] = [];
-    for (const child of this.children) {
-      const childLines = child.render(width);
-      ranges.push({ child, start: lines.length, end: lines.length + childLines.length });
-      for (const line of childLines) lines.push(line);
-    }
-    state.childRanges.set(this, ranges);
-    return lines;
-  };
-}
-
-/** Find the tool box covering `targetLine` (an index into the rendered buffer). */
-export function findToolComponentAtLine(root: object, targetLine: number): any | undefined {
-  let node: object = root;
-  let base = 0;
-  // Depth-bounded: the component tree is shallow, but never trust it to be acyclic.
-  for (let depth = 0; depth < 32; depth++) {
-    const ranges = state.childRanges.get(node);
-    if (!ranges) return undefined;
-    const hit = ranges.find((r) => targetLine >= base + r.start && targetLine < base + r.end);
-    if (!hit) return undefined;
-    if (hit.child instanceof ToolExecutionComponent) return hit.child;
-    base += hit.start;
-    node = hit.child as unknown as object;
-  }
-  return undefined;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // The frame patch
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -157,8 +80,6 @@ interface ToolBoxInternals {
   hideComponent: boolean;
   isPartial: boolean;
   result?: { isError: boolean };
-  expanded: boolean;
-  ui: any;
   selfRenderContainer: { render(width: number): string[] };
   contentBox: { render(width: number): string[] };
   contentText: { render(width: number): string[] };
@@ -184,7 +105,6 @@ export function patchToolBoxFrames(): void {
     if (!theme) return originalRender.call(this, width);
     try {
       if (this.hideComponent) return [];
-      state.tui = this.ui;
 
       const w = Math.max(4, width);
       const source = !this.hasRendererDefinition()
@@ -194,10 +114,10 @@ export function patchToolBoxFrames(): void {
           : this.contentBox;
       const raw = source.render(w - 2);
 
-      // The whole returned array is cached, not just the framed body: with
-      // pi-powerline-footer's compositor the root re-renders on every mouse
-      // packet, so an unchanged box must cost a fingerprint check and nothing
-      // more — no re-copying its lines into a fresh array.
+      // The whole returned array is cached, not just the framed body.
+      // pi-powerline-footer's compositor re-renders the entire root on every
+      // mouse packet while scrolling, so an unchanged box must cost a
+      // fingerprint check and nothing more — no re-copying its lines.
       const color = this.isPartial ? "borderMuted" : this.result?.isError ? "error" : "success";
       const fp = fingerprint(raw);
       // Image boxes skip the cache entirely: the text fingerprint says nothing
