@@ -49,6 +49,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Andy8647/pi-toolbox"
+    "url": "git+https://github.com/Andy8647/pi-toolbox.git"
   }
 }
