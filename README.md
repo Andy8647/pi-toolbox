@@ -8,7 +8,7 @@ Rounded transparent tool boxes with syntax highlighting for [pi](https://github.
 - **Every tool box** — built-in tools, MCP calls (pi-mcp-adapter), subagents, and any other extension's tools all get the same frame
 - **Transparent background** — no solid background fill, works with terminal transparency
 - **Status-aware border colors** — grey while executing, green on success, red on error
-- **Click to expand one box** — click any tool box to expand/collapse just that one; `ctrl+o` still toggles all of them
+- **Click to expand one box** (opt-in) — click any tool box to expand/collapse just that one; `ctrl+o` still toggles all of them
 - **Bash syntax highlighting** — commands get token-level coloring (commands, flags, strings, variables, operators, etc.)
 - **Scroll-safe caching** — content fingerprint caching prevents re-rendering on every scroll event
 
@@ -55,20 +55,31 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
 |-----|------|---------|-------------|
 | `enabled` | boolean | `true` | Enable/disable the extension |
 | `highlightBash` | boolean | `true` | Syntax-highlight bash commands |
-| `clickToExpand` | boolean | `true` | Click a tool box to expand only that box |
+| `clickToExpand` | boolean | `false` | Click a tool box to expand only that box (see below) |
 
 ### About click-to-expand
 
-pi does not enable mouse reporting on its own, so this extension turns on SGR
-mouse tracking (`?1000` + `?1006`) for the session and consumes the reports
-before they reach the editor. While it is on, the terminal routes clicks and
-the scroll wheel to pi instead of handling them itself:
+Off by default, because it takes the mouse away from the terminal for the whole
+session. pi does not enable mouse reporting on its own, so this extension turns
+on SGR mouse tracking (`?1000` + `?1006`) and consumes the reports before they
+reach the editor. While it is on, the terminal routes clicks and the scroll
+wheel to pi instead of handling them itself:
 
 - **Hold Shift** for native text selection and scrollback wheel scrolling
   (works in Ghostty, iTerm2, WezTerm, Kitty, and most modern terminals).
-- Set `"clickToExpand": false` to keep the terminal's default mouse behavior.
+- Mouse tracking is disabled again on shutdown.
 
-Mouse tracking is disabled again on shutdown.
+**It cannot work alongside an extension that already owns the mouse.**
+[pi-powerline-footer](https://github.com/Andy8647/pi-powerline-footer)'s
+fixed-editor compositor (`fixedEditor`, on by default) enables `?1002h` and
+consumes *every* SGR mouse report for its own scrolling and selection, so no
+click ever reaches this extension. pi-toolbox detects that setup and stands
+down instead of enabling a second, competing mouse mode — click-to-expand there
+has to live inside the compositor.
+
+Set `PI_TOOLBOX_DEBUG=1` to trace mouse handling to
+`~/.pi/agent/pi-toolbox-debug.log` (whether reports arrive, which line a click
+maps to, and which component was hit).
 
 ## How it works
 

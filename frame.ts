@@ -105,8 +105,12 @@ export function getTui(): any {
  * Container.render, re-implemented so each child's line range within the
  * container's output is recorded. Ranges are relative to the container, and
  * nest — walk from the TUI root to turn a buffer line into a component.
+ *
+ * Only installed when click-to-expand is active: it allocates a range object
+ * per child on every render of every container, which is pure overhead for
+ * sessions that never click.
  */
-function patchContainerRanges(): void {
+export function patchContainerRanges(): void {
   const proto = Container.prototype as unknown as {
     render(width: number): string[];
     children: ChildRange["child"][];
@@ -166,8 +170,6 @@ interface ToolBoxInternals {
 }
 
 export function patchToolBoxFrames(): void {
-  patchContainerRanges();
-
   const proto = ToolExecutionComponent.prototype as unknown as ToolBoxInternals & {
     render(width: number): string[];
     __toolboxFramed?: boolean;
@@ -190,36 +192,43 @@ export function patchToolBoxFrames(): void {
         : this.getRenderShell() === "self"
           ? this.selfRenderContainer
           : this.contentBox;
-      // pi's default shell pads content by one cell on every side; the frame
-      // supplies the vertical part, so only the blank padding rows are dropped.
-      const content = trimBlankEdges(source.render(w - 2));
+      const raw = source.render(w - 2);
 
-      const images: string[] = [];
-      for (let i = 0; i < this.imageComponents.length; i++) {
-        const spacer = this.imageSpacers[i];
-        if (spacer) images.push(...spacer.render(w));
-        const image = this.imageComponents[i];
-        if (image) images.push(...image.render(w));
+      // The whole returned array is cached, not just the framed body: with
+      // pi-powerline-footer's compositor the root re-renders on every mouse
+      // packet, so an unchanged box must cost a fingerprint check and nothing
+      // more — no re-copying its lines into a fresh array.
+      const color = this.isPartial ? "borderMuted" : this.result?.isError ? "error" : "success";
+      const fp = fingerprint(raw);
+      // Image boxes skip the cache entirely: the text fingerprint says nothing
+      // about an image component being swapped in (kitty PNG conversion
+      // finishes asynchronously and rebuilds them), so a hit would freeze the
+      // box on its pre-conversion frame.
+      const cacheable = this.imageComponents.length === 0;
+      const cache = this.__frameCache;
+      if (cacheable && cache && cache.width === w && cache.fp === fp && cache.color === color) {
+        return cache.out;
       }
 
-      if (content.length === 0 && images.length === 0) return [];
+      // pi's default shell pads content by one cell on every side; the frame
+      // supplies the vertical part, so only the blank padding rows are dropped.
+      const content = trimBlankEdges(raw);
 
-      const color = this.isPartial ? "borderMuted" : this.result?.isError ? "error" : "success";
       const out: string[] = [""];
       if (content.length > 0) {
-        const fp = fingerprint(content);
-        const cache = this.__frameCache;
-        if (cache && cache.width === w && cache.fp === fp && cache.color === color) {
-          out.push(...cache.out);
-        } else {
-          const framed = drawFrame(content, w, theme, color);
-          this.__frameCache = { width: w, fp, color, out: framed };
-          out.push(...framed);
-        }
+        for (const line of drawFrame(content, w, theme, color)) out.push(line);
       }
       // Images stay outside the frame: their lines carry terminal graphics
       // payloads that padding/truncation would corrupt.
-      out.push(...images);
+      for (let i = 0; i < this.imageComponents.length; i++) {
+        const spacer = this.imageSpacers[i];
+        if (spacer) for (const line of spacer.render(w)) out.push(line);
+        const image = this.imageComponents[i];
+        if (image) for (const line of image.render(w)) out.push(line);
+      }
+
+      if (out.length === 1) return [];
+      if (cacheable) this.__frameCache = { width: w, fp, color, out };
       return out;
     } catch {
       return originalRender.call(this, width);

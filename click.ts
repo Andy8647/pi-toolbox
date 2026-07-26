@@ -11,7 +11,23 @@
  * and scrollback wheel scrolling (Ghostty, iTerm2, WezTerm, Kitty, …).
  */
 
-import { findToolComponentAtLine, getTui } from "./frame.ts";
+import { appendFileSync } from "node:fs";
+import { findToolComponentAtLine, getTui, patchContainerRanges } from "./frame.ts";
+import { mouseOwnedElsewhere } from "./config.ts";
+
+// PI_TOOLBOX_DEBUG=1 traces mouse handling to ~/.pi/agent/pi-toolbox-debug.log.
+// Logging to stdout is not an option — it is the rendered screen.
+const DEBUG = process.env.PI_TOOLBOX_DEBUG === "1";
+
+function debug(message: string): void {
+  if (!DEBUG) return;
+  try {
+    const dir = process.env.PI_CODING_AGENT_DIR || `${process.env.HOME || "/tmp"}/.pi/agent`;
+    appendFileSync(`${dir}/pi-toolbox-debug.log`, `${new Date().toISOString()} ${message}\n`);
+  } catch {
+    // debugging must never break the session
+  }
+}
 
 interface UiContext {
   onTerminalInput(handler: (data: string) => { consume?: boolean; data?: string } | undefined): () => void;
@@ -61,14 +77,24 @@ function bufferLineForRow(tui: any, row: number): number | undefined {
 
 function handleClick(row: number): void {
   const tui = getTui();
-  if (!tui) return;
+  if (!tui) {
+    debug(`click row=${row} but no TUI captured yet`);
+    return;
+  }
   // Dialogs and selectors own the screen while they are up.
-  if (typeof tui.hasOverlay === "function" && tui.hasOverlay()) return;
+  if (typeof tui.hasOverlay === "function" && tui.hasOverlay()) {
+    debug(`click row=${row} ignored: overlay open`);
+    return;
+  }
 
   const line = bufferLineForRow(tui, row);
+  debug(
+    `click row=${row} -> line=${line} (buffer=${tui.previousLines?.length} rows=${tui.terminal?.rows} viewportTop=${tui.previousViewportTop})`,
+  );
   if (line === undefined) return;
 
   const component = findToolComponentAtLine(tui, line);
+  debug(`  hit=${component ? component.constructor.name : "none"}`);
   if (!component) return;
 
   component.setExpanded(!component.expanded);
@@ -80,6 +106,15 @@ export function enableClickToExpand(ui: UiContext): (() => void) | undefined {
   if (isActive()) return undefined;
   if (!process.stdout.isTTY) return undefined;
 
+  const owner = mouseOwnedElsewhere();
+  if (owner) {
+    // Enabling our own tracking here would fight the other extension's mode
+    // handling, and its input listener consumes every report before ours runs.
+    debug(`click-to-expand disabled: mouse owned by ${owner}`);
+    return undefined;
+  }
+
+  patchContainerRanges();
   process.stdout.write(ENABLE_MOUSE);
   setActive(true);
 
@@ -88,9 +123,15 @@ export function enableClickToExpand(ui: UiContext): (() => void) | undefined {
   // (ctrl+c, /exit, session_shutdown) all reach this.
   process.on("exit", disableMouse);
 
+  debug("mouse tracking enabled");
+
   const unsubscribe = ui.onTerminalInput((data) => {
     const match = SGR_MOUSE_RE.exec(data);
-    if (!match) return undefined;
+    if (!match) {
+      if (DEBUG && data.includes("\x1b[<")) debug(`unmatched mouse-ish input: ${JSON.stringify(data)}`);
+      return undefined;
+    }
+    debug(`mouse report ${JSON.stringify(data)}`);
 
     const button = Number(match[1]);
     const row = Number(match[3]);
