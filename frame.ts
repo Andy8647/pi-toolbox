@@ -14,7 +14,7 @@
  */
 
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
+import { keyText, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { getTheme, type ThemeLike } from "./theme-access.ts";
 
 // Solid background fills: truecolor/256 "48;…" sequences and the standard
@@ -32,6 +32,31 @@ function padToWidth(line: string, width: number): string {
   if (w === width) return line;
   if (w < width) return line + " ".repeat(width - w);
   return truncateToWidth(line, width);
+}
+
+/**
+ * The `(ctrl+o to collapse)` row an expanded box shows as its last content
+ * line — the same text bash boxes render natively when open
+ * (bash-execution.js), built through the same `keyText` so it follows
+ * whatever is bound to `app.tools.expand`. It is a truthful keyboard hint
+ * for every user, and pi-starline's click-to-collapse additionally hit-tests
+ * it as the anchor that closes the box. Undefined when no key is bound —
+ * with nothing on screen to match, there is no anchor to show.
+ */
+function collapseAnchorLine(theme: ThemeLike): string | undefined {
+  let keys = "";
+  try {
+    keys = keyText("app.tools.expand" as never);
+  } catch {
+    return undefined;
+  }
+  if (!keys) return undefined;
+  return (
+    theme.fg("muted", "(") +
+    theme.fg("dim", keys) +
+    theme.fg("muted", " to collapse") +
+    theme.fg("muted", ")")
+  );
 }
 
 /** Cheap content fingerprint — avoids O(n) line-by-line cache comparison. */
@@ -79,6 +104,7 @@ function drawFrame(lines: string[], width: number, theme: ThemeLike, color: stri
 interface ToolBoxInternals {
   hideComponent: boolean;
   isPartial: boolean;
+  expanded: boolean;
   result?: { isError: boolean };
   selfRenderContainer: { render(width: number): string[] };
   contentBox: { render(width: number): string[] };
@@ -87,10 +113,10 @@ interface ToolBoxInternals {
   imageSpacers: Array<{ render(width: number): string[] }>;
   hasRendererDefinition(): boolean;
   getRenderShell(): "default" | "self";
-  __frameCache?: { width: number; fp: string; color: string; out: string[] };
+  __frameCache?: { width: number; fp: string; color: string; expanded: boolean; out: string[] };
 }
 
-export function patchToolBoxFrames(): void {
+export function patchToolBoxFrames(collapseAnchor = true): void {
   const proto = ToolExecutionComponent.prototype as unknown as ToolBoxInternals & {
     render(width: number): string[];
     __toolboxFramed?: boolean;
@@ -126,13 +152,28 @@ export function patchToolBoxFrames(): void {
       // box on its pre-conversion frame.
       const cacheable = this.imageComponents.length === 0;
       const cache = this.__frameCache;
-      if (cacheable && cache && cache.width === w && cache.fp === fp && cache.color === color) {
+      if (
+        cacheable &&
+        cache &&
+        cache.width === w &&
+        cache.fp === fp &&
+        cache.color === color &&
+        cache.expanded === this.expanded
+      ) {
         return cache.out;
       }
 
       // pi's default shell pads content by one cell on every side; the frame
       // supplies the vertical part, so only the blank padding rows are dropped.
       const content = trimBlankEdges(raw);
+      // An expanded box gets a collapse anchor as its last content row. pi
+      // itself only renders an expand hint, and only while collapsed, for the
+      // tool types this component covers — so without this row there is no
+      // way back but ctrl+o closing every box at once.
+      if (collapseAnchor && this.expanded && content.length > 0) {
+        const anchor = collapseAnchorLine(theme);
+        if (anchor) content.push(anchor);
+      }
 
       const out: string[] = [""];
       if (content.length > 0) {
@@ -148,7 +189,7 @@ export function patchToolBoxFrames(): void {
       }
 
       if (out.length === 1) return [];
-      if (cacheable) this.__frameCache = { width: w, fp, color, out };
+      if (cacheable) this.__frameCache = { width: w, fp, color, expanded: this.expanded, out };
       return out;
     } catch {
       return originalRender.call(this, width);

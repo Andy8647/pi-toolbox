@@ -8,6 +8,7 @@
  * Configuration (settings.json → "toolbox"):
  *   enabled: boolean        — enable/disable the extension (default: true)
  *   highlightBash: boolean  — syntax-highlight bash commands (default: true)
+ *   collapseAnchor: boolean — `(ctrl+o to collapse)` row on expanded boxes (default: true)
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -74,7 +75,7 @@ export default function (pi: ExtensionAPI): void {
   if (!config.enabled) return;
 
   try {
-    patchToolBoxFrames();
+    patchToolBoxFrames(config.collapseAnchor);
   } catch (error) {
     console.debug("[pi-toolbox] tool box frame patch failed:", error);
   }

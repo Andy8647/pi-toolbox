@@ -9,6 +9,7 @@ Rounded transparent tool boxes with syntax highlighting for [pi](https://github.
 - **Transparent background** — no solid background fill, works with terminal transparency
 - **Status-aware border colors** — grey while executing, green on success, red on error
 - **Bash syntax highlighting** — commands get token-level coloring (commands, flags, strings, variables, operators, etc.)
+- **Collapse anchor** — an expanded box shows a `(ctrl+o to collapse)` row as its last line, the same text bash boxes show natively; pi-starline additionally makes it clickable to close just that box
 - **Scroll-safe caching** — content fingerprint caching prevents re-rendering on every scroll event
 
 ## Screenshot
@@ -44,7 +45,8 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
 {
   "toolbox": {
     "enabled": true,
-    "highlightBash": true
+    "highlightBash": true,
+    "collapseAnchor": true
   }
 }
 ```
@@ -53,6 +55,7 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
 |-----|------|---------|-------------|
 | `enabled` | boolean | `true` | Enable/disable the extension |
 | `highlightBash` | boolean | `true` | Syntax-highlight bash commands |
+| `collapseAnchor` | boolean | `true` | Show a `(ctrl+o to collapse)` row at the bottom of expanded tool boxes |
 
 ## How it works
 

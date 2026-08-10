@@ -4,11 +4,14 @@ import { join } from "node:path";
 export interface ToolboxConfig {
   enabled: boolean;
   highlightBash: boolean;
+  /** Append a `(ctrl+o to collapse)` anchor row to expanded tool boxes. */
+  collapseAnchor: boolean;
 }
 
 const DEFAULTS: ToolboxConfig = {
   enabled: true,
   highlightBash: true,
+  collapseAnchor: true,
 };
 
 function readSettings(): any {
@@ -22,6 +25,7 @@ export function loadConfig(): ToolboxConfig {
     return {
       enabled: toolbox?.enabled ?? DEFAULTS.enabled,
       highlightBash: toolbox?.highlightBash ?? DEFAULTS.highlightBash,
+      collapseAnchor: toolbox?.collapseAnchor ?? DEFAULTS.collapseAnchor,
     };
   } catch {
     return { ...DEFAULTS };
