@@ -16,7 +16,11 @@ const SHELL_KEYWORDS = new Set([
   "case", "esac", "in", "function", "select", "time", "coproc", "{", "}", "!",
 ]);
 
-const WORD_BREAK = /[\s'"`$|&;<>()#]/;
+// NOTE: '#' is deliberately NOT a word break. A '#' only starts a comment at
+// word start (handled above), so a mid-word '#' (fill:#242f60, a#b, url#frag)
+// must stay inside the word. Treating it as a break used to leave the scanner
+// unable to advance — see the progress guard in highlightBashCommand.
+const WORD_BREAK = /[\s'"`$|&;<>()]/;
 
 /**
  * Tokenize and color a shell command string.
@@ -125,6 +129,16 @@ export function highlightBashCommand(
     // word
     let j = i;
     while (j < n && !WORD_BREAK.test(command[j])) j++;
+    // Progress guard: every branch above either advanced `i` or is reached only
+    // when `command[i]` is not a word break. If some future/unhandled break
+    // character lands here, `j === i` and a bare `continue` would spin forever
+    // pushing empty strings (this froze the whole TUI on `echo a#b`). Emit the
+    // character plainly and move on — the tokenizer must always terminate.
+    if (j === i) {
+      push(c, null);
+      i++;
+      continue;
+    }
     const word = command.slice(i, j);
     i = j;
 

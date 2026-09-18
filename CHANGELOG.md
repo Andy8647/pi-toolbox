@@ -3,6 +3,29 @@
 What changed in each released version of pi-toolbox. Versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-09-18
+
+### Fixed
+
+**Bash syntax highlighting can no longer freeze the whole interface.** A `#`
+that was neither at the start of a word nor inside quotes — `fill:#242f60`,
+`a#b`, `url#frag` — was treated as a word break that no branch handled. The
+scanner stopped advancing and pushed empty strings until the process ran out of
+memory. Because the call row is re-rendered on every tool-argument delta, a
+streaming command containing one of these deadlocked the TUI: 100% CPU, no
+repaint, `ctrl+c` unresponsive, and the session file stopped updating. The
+process could not recover on its own and survived closing the terminal tab.
+
+Bare `\r` and other non-space whitespace (`\u00a0`, `\v`, `\f`) reached the same
+dead end, because they are word breaks too.
+
+The tokenizer now keeps a mid-word `#` inside the word, and the scanner can
+never loop without consuming a character — an unhandled break character is
+emitted as plain text instead of spinning. `test/bash-highlight.test.ts` covers
+the reported shapes, a heredoc with a hex colour, and 400 randomized inputs
+containing `#`, `\r` and non-ASCII spaces; every case asserts termination (a hang
+is detected by a worker deadline) and that no character is dropped.
+
 ## [0.2.2] - 2026-08-10
 
 ### Added
