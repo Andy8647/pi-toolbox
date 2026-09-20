@@ -6,7 +6,9 @@ Rounded transparent tool boxes with syntax highlighting for [pi](https://github.
 
 - **Rounded borders** — ╭╮╰╯ box drawing instead of pi's default ┌┐└┘
 - **Every tool box** — built-in tools, MCP calls (pi-mcp-adapter), subagents, and any other extension's tools all get the same frame
-- **Every message box** — user messages, compaction and branch summaries, skill invocations, and extension custom messages get the same frame in a distinct border color (default: `accent`)
+- **Every message box** — compaction and branch summaries, skill invocations, and extension custom messages get the same frame, each kind in its own border color (user messages are left to pi-starline by default)
+- **Per-tool border colors** — successful boxes take their tool's color (bash/read/edit/write/… configurable); pending stays grey, errors stay red
+- **Nerd Font icons** — every box gets a kind icon; file tools additionally show the target file's nvim-web-devicons glyph (`read foo.ts` → eye + TypeScript icon)
 - **Transparent background** — no solid background fill, works with terminal transparency
 - **Status-aware border colors** — grey while executing, green on success, red on error
 - **Bash syntax highlighting** — commands get token-level coloring (commands, flags, strings, variables, operators, etc.)
@@ -49,7 +51,24 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
     "highlightBash": true,
     "collapseAnchor": true,
     "frameMessages": true,
-    "messageBorderColor": "accent"
+    "frameUserMessages": false,
+    "icons": true,
+    "toolColors": {
+      "bash": "bashMode",
+      "read": "toolTitle",
+      "edit": "syntaxVariable",
+      "write": "syntaxType",
+      "grep": "syntaxOperator",
+      "find": "syntaxOperator",
+      "ls": "syntaxOperator"
+    },
+    "messageBorderColors": {
+      "user": "toolTitle",
+      "compaction": "customMessageLabel",
+      "branch": "mdCode",
+      "skill": "accent",
+      "custom": "warning"
+    }
   }
 }
 ```
@@ -59,8 +78,18 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
 | `enabled` | boolean | `true` | Enable/disable the extension |
 | `highlightBash` | boolean | `true` | Syntax-highlight bash commands |
 | `collapseAnchor` | boolean | `true` | Show a `(ctrl+o to collapse)` row at the bottom of expanded tool boxes |
-| `frameMessages` | boolean | `true` | Frame user/compaction/branch/skill/custom-message boxes like tool boxes |
-| `messageBorderColor` | string | `"accent"` | Theme fg color for message-box borders (any `ThemeColor` name) |
+| `frameMessages` | boolean | `true` | Frame compaction/branch/skill/custom-message boxes like tool boxes |
+| `frameUserMessages` | boolean | `false` | Also frame user messages — off by default because pi-starline already restyles `UserMessageComponent`, and two render patches on one prototype fight over the output. Enable only without pi-starline |
+| `icons` | boolean | `true` | Nerd Font icons on every box. Requires a Nerd Font; set `false` otherwise |
+| `toolColors` | object | see above | Border color per tool name for successful executions (pending stays grey, errors stay red). When set, the map **replaces** the defaults — `{}` disables per-tool colors |
+| `messageBorderColors` | object | see above | Per-kind message-box border colors; merged over the defaults |
+
+All color values are theme fg color names (`ThemeColor`), so they follow the
+active theme. Default palette rationale: tool boxes reserve green/red/grey for
+execution status, so message kinds get hues that don't collide —
+`customMessageLabel` (mauve, matching the `[compaction]` label) for
+compactions, `mdCode` (peach) for branch summaries, `accent` (sky) for skill
+invocations, `warning` (yellow) for extension notices.
 
 ## How it works
 
@@ -68,11 +97,12 @@ pi builds one `ToolExecutionComponent` per tool call, no matter which extension
 registered the tool. The extension API cannot wrap another extension's
 renderers, so pi-toolbox patches that component's `render` instead — which is
 why MCP and subagent boxes are framed too. Message boxes (compaction, branch
-summary, skill invocation, user message, extension custom message) never go
-through that component; their own prototypes get the same treatment, with two
-exceptions that keep their native styling: custom messages rendered by an
+summary, skill invocation, extension custom message) never go through that
+component; their own prototypes get the same treatment, with two exceptions
+that keep their native styling: custom messages rendered by an
 extension-provided renderer, and `!` bash-mode executions, which already draw
-their own border. Only `bash` is re-registered, purely to add syntax
+their own border. User messages are skipped by default because pi-starline
+patches the same prototype. Only `bash` is re-registered, purely to add syntax
 highlighting to the command row.
 
 An unchanged box returns its cached line array outright, because a compositor

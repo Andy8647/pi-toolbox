@@ -16,8 +16,19 @@ User messages keep their OSC 133 zone markers, and custom messages rendered
 by an extension-provided renderer are left untouched — the renderer owns its
 styling.
 
+**Tool boxes can take per-tool border colors and Nerd Font icons.** A
+successful box uses its tool's configured color instead of green (pending
+stays grey, errors stay red), and every box's call row gets a kind icon —
+file tools additionally show the target file's nvim-web-devicons glyph
+(`read foo.ts` renders an eye plus the TypeScript icon).
+
 New settings under `toolbox`: `frameMessages` (default `true`) toggles the
-message frames, and `messageBorderColors` picks a border color per message
+message frames; `frameUserMessages` (default `false`) opts user messages in
+— they are skipped by default because pi-starline patches the same
+prototype, and two render patches on one prototype fight over the output;
+`icons` (default `true`, requires a Nerd Font) toggles the icons;
+`toolColors` maps tool names to success border colors (replaces defaults
+when set); `messageBorderColors` picks a border color per message
 kind — `user` (`toolTitle`), `compaction` (`customMessageLabel`), `branch`
 (`mdCode`), `skill` (`accent`), `custom` (`warning`). Values are theme fg
 color names, so they follow the active theme; tool boxes keep their

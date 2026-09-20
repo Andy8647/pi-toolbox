@@ -24,6 +24,7 @@ import {
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
 import { getTheme, type ThemeLike } from "./theme-access.ts";
+import { MESSAGE_ICONS, toolIconPrefix } from "./icons.ts";
 
 // Solid background fills: truecolor/256 "48;…" sequences and the standard
 // 40-47 / 100-107 bg colors. pi's shell and some built-in renderers (edit)
@@ -113,6 +114,8 @@ interface ToolBoxInternals {
   hideComponent: boolean;
   isPartial: boolean;
   expanded: boolean;
+  toolName: string;
+  args?: unknown;
   result?: { isError: boolean };
   selfRenderContainer: { render(width: number): string[] };
   contentBox: { render(width: number): string[] };
@@ -124,7 +127,16 @@ interface ToolBoxInternals {
   __frameCache?: { width: number; fp: string; color: string; expanded: boolean; out: string[] };
 }
 
-export function patchToolBoxFrames(collapseAnchor = true): void {
+export interface ToolFrameOptions {
+  collapseAnchor?: boolean;
+  /** Prepend a Nerd Font icon (tool kind or target file type) to the call row. */
+  icons?: boolean;
+  /** Per-tool-name border color for successful executions (theme fg color names). */
+  toolColors?: Record<string, string>;
+}
+
+export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
+  const { collapseAnchor = true, icons = false, toolColors = {} } = options;
   const proto = ToolExecutionComponent.prototype as unknown as ToolBoxInternals & {
     render(width: number): string[];
     __toolboxFramed?: boolean;
@@ -146,13 +158,25 @@ export function patchToolBoxFrames(collapseAnchor = true): void {
         : this.getRenderShell() === "self"
           ? this.selfRenderContainer
           : this.contentBox;
-      const raw = source.render(w - 2);
+      // The icon prefix takes cells off the call row; rendering the source
+      // narrower keeps every line lossless instead of truncating the frame.
+      const iconPrefix = icons ? `${toolIconPrefix(this.toolName, this.args)} ` : "";
+      const iconCells = iconPrefix ? visibleWidth(iconPrefix) : 0;
+      const raw = source.render(w - 2 - iconCells);
 
       // The whole returned array is cached, not just the framed body.
       // pi-powerline-footer's compositor re-renders the entire root on every
       // mouse packet while scrolling, so an unchanged box must cost a
       // fingerprint check and nothing more — no re-copying its lines.
-      const color = this.isPartial ? "borderMuted" : this.result?.isError ? "error" : "success";
+      //
+      // Border color tracks tool state, then per-tool identity: pending is
+      // grey and error is red no matter what; a successful box takes its
+      // tool's configured color, falling back to green.
+      const color = this.isPartial
+        ? "borderMuted"
+        : this.result?.isError
+          ? "error"
+          : toolColors[this.toolName] || "success";
       const fp = fingerprint(raw);
       // Image boxes skip the cache entirely: the text fingerprint says nothing
       // about an image component being swapped in (kitty PNG conversion
@@ -174,6 +198,9 @@ export function patchToolBoxFrames(collapseAnchor = true): void {
       // pi's default shell pads content by one cell on every side; the frame
       // supplies the vertical part, so only the blank padding rows are dropped.
       const content = trimBlankEdges(raw);
+      if (iconPrefix && content.length > 0) {
+        content[0] = `${iconPrefix}${content[0]}`;
+      }
       // An expanded box gets a collapse anchor as its last content row. pi
       // itself only renders an expand hint, and only while collapsed, for the
       // tool types this component covers — so without this row there is no
@@ -229,11 +256,12 @@ interface MessageBoxInternals {
 export function patchMessageBoxes(
   borderColors: { compaction: string; branch: string; skill: string },
   collapseAnchor = true,
+  icons = false,
 ): void {
-  for (const [cls, borderColor] of [
-    [CompactionSummaryMessageComponent, borderColors.compaction],
-    [BranchSummaryMessageComponent, borderColors.branch],
-    [SkillInvocationMessageComponent, borderColors.skill],
+  for (const [cls, borderColor, icon] of [
+    [CompactionSummaryMessageComponent, borderColors.compaction, MESSAGE_ICONS.compaction],
+    [BranchSummaryMessageComponent, borderColors.branch, MESSAGE_ICONS.branch],
+    [SkillInvocationMessageComponent, borderColors.skill, MESSAGE_ICONS.skill],
   ] as const) {
     const proto = cls.prototype as unknown as MessageBoxInternals & { __toolboxFramed?: boolean };
     if (proto.__toolboxFramed) continue;
@@ -246,8 +274,8 @@ export function patchMessageBoxes(
       if (!theme) return originalRender.call(this, width);
       try {
         const w = Math.max(4, width);
-        // Frame + one cell of horizontal padding on each side.
-        const contentWidth = Math.max(1, w - 4);
+        // Frame + one cell of horizontal padding on each side (+2 for the icon).
+        const contentWidth = Math.max(1, icons ? w - 6 : w - 4);
         const content: string[] = [];
         for (const child of this.children) {
           for (const line of child.render(contentWidth)) {
@@ -265,7 +293,9 @@ export function patchMessageBoxes(
         const sample = theme.fg(borderColor, "·");
         const cache = this.__msgFrameCache;
         if (cache && cache.width === w && cache.fp === fp && cache.sample === sample) return cache.out;
-        const padded = content.map((line) => ` ${line}`);
+        const padded = content.map((line, i) =>
+          icons && i === 0 ? ` ${icon} ${line}` : ` ${line}`,
+        );
         const out = ["", ...drawFrame(padded, w, theme, borderColor)];
         this.__msgFrameCache = { width: w, fp, sample, out };
         return out;
@@ -304,8 +334,27 @@ interface ContainerBoxInternals {
  * vertical padding rows are stripped, and the rounded border takes over —
  * the box's own horizontal padding is kept as the insets.
  */
-export function patchContainerBoxes(borderColors: { user: string; custom: string }): void {
-  const patch = (cls: { prototype: unknown }, borderColor: string, isUserMessage: boolean) => {
+export interface ContainerBoxOptions {
+  icons?: boolean;
+  /**
+   * Frame user messages too. Default false: pi-starline already restyles
+   * UserMessageComponent.prototype.render, and two render patches on the
+   * same prototype fight over the output. Enable only without pi-starline.
+   */
+  includeUser?: boolean;
+}
+
+export function patchContainerBoxes(
+  borderColors: { user: string; custom: string },
+  options: ContainerBoxOptions = {},
+): void {
+  const { icons = false, includeUser = false } = options;
+  const patch = (
+    cls: { prototype: unknown },
+    borderColor: string,
+    icon: string,
+    isUserMessage: boolean,
+  ) => {
     const proto = cls.prototype as ContainerBoxInternals & { __toolboxFramed?: boolean };
     if (proto.__toolboxFramed) return;
     proto.__toolboxFramed = true;
@@ -322,9 +371,12 @@ export function patchContainerBoxes(borderColors: { user: string; custom: string
         if (!box) return originalRender.call(this, width);
 
         const w = Math.max(4, width);
-        const raw = box.render(w - 2).map(stripBackgroundFills);
+        // Icons take two cells of the first row; rendering the box narrower
+        // keeps every line lossless.
+        const raw = box.render(icons ? w - 4 : w - 2).map(stripBackgroundFills);
         const content = trimBlankEdges(raw);
         if (content.length === 0) return [];
+        if (icons) content[0] = `${icon} ${content[0]}`;
 
         const fp = fingerprint(content);
         const sample = theme.fg(borderColor, "·");
@@ -344,6 +396,6 @@ export function patchContainerBoxes(borderColors: { user: string; custom: string
     };
   };
 
-  patch(UserMessageComponent, borderColors.user, true);
-  patch(CustomMessageComponent, borderColors.custom, false);
+  if (includeUser) patch(UserMessageComponent, borderColors.user, MESSAGE_ICONS.user, true);
+  patch(CustomMessageComponent, borderColors.custom, MESSAGE_ICONS.custom, false);
 }

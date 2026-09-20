@@ -10,9 +10,13 @@
  *   highlightBash: boolean  — syntax-highlight bash commands (default: true)
  *   collapseAnchor: boolean — `(ctrl+o to collapse)` row on expanded boxes (default: true)
  *   frameMessages: boolean  — rounded frame on message boxes (default: true)
+ *   frameUserMessages: boolean — also frame user messages (default: false;
+ *     pi-starline already restyles them and two render patches would fight)
+ *   icons: boolean          — Nerd Font icons on boxes (default: true)
  *   messageBorderColors: per-kind theme fg colors for message-box borders
  *     (user/compaction/branch/skill/custom; defaults toolTitle/customMessageLabel/
  *      mdCode/accent/warning)
+ *   toolColors: per-tool border color on success (replaces defaults when set)
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -79,15 +83,22 @@ export default function (pi: ExtensionAPI): void {
   if (!config.enabled) return;
 
   try {
-    patchToolBoxFrames(config.collapseAnchor);
+    patchToolBoxFrames({
+      collapseAnchor: config.collapseAnchor,
+      icons: config.icons,
+      toolColors: config.toolColors,
+    });
   } catch (error) {
     console.debug("[pi-toolbox] tool box frame patch failed:", error);
   }
 
   if (config.frameMessages) {
     try {
-      patchMessageBoxes(config.messageBorderColors, config.collapseAnchor);
-      patchContainerBoxes(config.messageBorderColors);
+      patchMessageBoxes(config.messageBorderColors, config.collapseAnchor, config.icons);
+      patchContainerBoxes(config.messageBorderColors, {
+        icons: config.icons,
+        includeUser: config.frameUserMessages,
+      });
     } catch (error) {
       console.debug("[pi-toolbox] message box frame patch failed:", error);
     }

@@ -42,13 +42,13 @@ function fakeMessage() {
   return { tokensBefore: 357695, summary: "summary text" } as any;
 }
 
-for (const [name, Component, arg, color] of [
-  ["compaction", CompactionSummaryMessageComponent, fakeMessage(), COLORS.compaction],
-  ["branch summary", BranchSummaryMessageComponent, fakeMessage(), COLORS.branch],
-  ["skill invocation", SkillInvocationMessageComponent, { name: "demo", content: "skill text" }, COLORS.skill],
+for (const [name, Component, arg, color, icon] of [
+  ["compaction", CompactionSummaryMessageComponent, fakeMessage(), COLORS.compaction, "\u{f066}"],
+  ["branch summary", BranchSummaryMessageComponent, fakeMessage(), COLORS.branch, "\u{f126}"],
+  ["skill invocation", SkillInvocationMessageComponent, { name: "demo", content: "skill text" }, COLORS.skill, "\u{f0d0}"],
 ] as const) {
   test(`${name} box gets a rounded transparent frame in its own color`, () => {
-    patchMessageBoxes(COLORS, true);
+    patchMessageBoxes(COLORS, true, true);
     const component = new (Component as any)(arg);
     const lines: string[] = component.render(60);
 
@@ -64,13 +64,14 @@ for (const [name, Component, arg, color] of [
       body.includes("[compaction]") || body.includes("[branch]") || body.includes("[skill]"),
       "label kept",
     );
+    assert.ok(lines[2].includes(icon), "kind icon on the first content line");
     if (name === "compaction") assert.ok(body.includes("357,695"), "token count kept");
     assert.ok(!BG_FILL_RE.test(body), "no background fill escapes");
   });
 }
 
 test("expanded compaction box renders its summary inside the frame", () => {
-  patchMessageBoxes(COLORS, true);
+  patchMessageBoxes(COLORS, true, true);
   const component = new CompactionSummaryMessageComponent(fakeMessage() as any);
   component.setExpanded(true);
   const lines: string[] = component.render(60);
@@ -82,7 +83,7 @@ test("expanded compaction box renders its summary inside the frame", () => {
 });
 
 test("user message gets a frame in the user color and keeps its OSC133 zone markers", () => {
-  patchContainerBoxes(COLORS);
+  patchContainerBoxes(COLORS, { icons: true, includeUser: true });
   const component = new UserMessageComponent("hello **world**" as never);
   const lines: string[] = component.render(60);
 
@@ -90,22 +91,24 @@ test("user message gets a frame in the user color and keeps its OSC133 zone mark
   assert.match(lines.at(-1)!, /^\x1b\]133;B\x07\x1b\]133;C\x07/, "zone end+final on last line");
   assert.ok(lines.some((l) => l.includes(`<fg:${COLORS.user}>╭`)), "rounded top border in user color");
   assert.ok(lines.some((l) => l.includes(`<fg:${COLORS.user}>╰`)), "rounded bottom border in user color");
+  assert.ok(lines.join("\n").includes("\u{f007}"), "user icon present");
   assert.ok(lines.join("\n").includes("hello"), "content kept");
   assert.ok(!BG_FILL_RE.test(lines.join("\n")), "no background fill escapes");
 });
 
 test("custom message with default rendering gets a frame in the custom color", () => {
-  patchContainerBoxes(COLORS);
+  patchContainerBoxes(COLORS, { icons: true, includeUser: true });
   const component = new CustomMessageComponent({ customType: "notice", content: "pay attention" } as any);
   const lines: string[] = component.render(60);
   assert.ok(lines.some((l) => l.includes(`<fg:${COLORS.custom}>╭`)), "rounded top border in custom color");
   const body = lines.join("\n");
   assert.ok(body.includes("[notice]"), "label kept");
   assert.ok(body.includes("pay attention"), "content kept");
+  assert.ok(body.includes("\u{f12e}"), "puzzle icon present");
 });
 
 test("custom message with an extension renderer is left alone", () => {
-  patchContainerBoxes(COLORS);
+  patchContainerBoxes(COLORS, { icons: true, includeUser: true });
   const renderer = () => new Text("extension-owned styling", 0, 0);
   const component = new CustomMessageComponent(
     { customType: "fancy", content: "ignored" } as any,
@@ -117,7 +120,7 @@ test("custom message with an extension renderer is left alone", () => {
 });
 
 test("unknown border color falls back to the original render", () => {
-  patchMessageBoxes(COLORS, true);
+  patchMessageBoxes(COLORS, true, true);
   const component = new CompactionSummaryMessageComponent(fakeMessage() as any);
   (globalThis as any)[THEME_KEY] = {
     fg: () => {

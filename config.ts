@@ -16,15 +16,37 @@ export interface ToolboxConfig {
   collapseAnchor: boolean;
   /** Give message boxes the same rounded transparent frame as tool boxes. */
   frameMessages: boolean;
+  /** Frame user messages too — off by default because pi-starline owns them. */
+  frameUserMessages: boolean;
+  /** Prepend Nerd Font icons (tool kind / file type / message kind). */
+  icons: boolean;
   /** Per-kind theme fg colors for message-box borders (any ThemeColor name). */
   messageBorderColors: MessageBorderColors;
+  /**
+   * Per-tool border color for successful executions (theme fg color names;
+   * pending stays grey, error stays red). When set in settings, the map
+   * REPLACES the defaults entirely — `{}` disables per-tool colors.
+   */
+  toolColors: Record<string, string>;
 }
+
+const DEFAULT_TOOL_COLORS: Record<string, string> = {
+  bash: "bashMode",
+  read: "toolTitle",
+  edit: "syntaxVariable",
+  write: "syntaxType",
+  grep: "syntaxOperator",
+  find: "syntaxOperator",
+  ls: "syntaxOperator",
+};
 
 const DEFAULTS: ToolboxConfig = {
   enabled: true,
   highlightBash: true,
   collapseAnchor: true,
   frameMessages: true,
+  frameUserMessages: false,
+  icons: true,
   messageBorderColors: {
     user: "toolTitle",
     compaction: "customMessageLabel",
@@ -32,6 +54,7 @@ const DEFAULTS: ToolboxConfig = {
     skill: "accent",
     custom: "warning",
   },
+  toolColors: DEFAULT_TOOL_COLORS,
 };
 
 function readSettings(): any {
@@ -47,10 +70,14 @@ export function loadConfig(): ToolboxConfig {
       highlightBash: toolbox?.highlightBash ?? DEFAULTS.highlightBash,
       collapseAnchor: toolbox?.collapseAnchor ?? DEFAULTS.collapseAnchor,
       frameMessages: toolbox?.frameMessages ?? DEFAULTS.frameMessages,
+      frameUserMessages: toolbox?.frameUserMessages ?? DEFAULTS.frameUserMessages,
+      icons: toolbox?.icons ?? DEFAULTS.icons,
       messageBorderColors: {
         ...DEFAULTS.messageBorderColors,
         ...toolbox?.messageBorderColors,
       },
+      // Replace, not merge: removing a tool's color must be expressible.
+      toolColors: toolbox?.toolColors ?? DEFAULTS.toolColors,
     };
   } catch {
     return { ...DEFAULTS };
