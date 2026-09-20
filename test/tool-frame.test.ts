@@ -90,6 +90,28 @@ test("read without a path arg falls back to the read tool icon", () => {
   assert.ok(lines[2].includes("\u{f06e}"), "eye icon");
 });
 
+test("file icon lands outside the OSC 8 hyperlink, never inside its URL", () => {
+  // Real write/read renderCall wraps the path in an ST-terminated OSC 8
+  // hyperlink whose URL contains the path — a naive indexOf would inject
+  // the icon into the escape sequence (invisible + corrupts the link).
+  const path = "/tmp/pi-toolbox-demo/demo.ts";
+  const opener = `\x1b]8;;file://${path}\x1b\\`;
+  const closer = "\x1b]8;;\x1b\\";
+  const callRow = `write ${opener}\x1b[96m${path}\x1b[0m${closer}`;
+  const lines = fakeToolBox("write", { path }, { callRow }).render(60);
+  const row = lines[2];
+
+  assert.ok(row.includes(opener), "hyperlink opener intact");
+  assert.ok(!opener.includes("\u{f06e6}"), "URL not polluted by the icon");
+  const visible = row.replace(
+    /\x1b(?:\[[0-9;:?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?)/g,
+    "",
+  );
+  const fileIdx = visible.indexOf("\u{f06e6}");
+  assert.ok(fileIdx >= 0, "file icon visible");
+  assert.ok(fileIdx < visible.indexOf(path), "icon sits in front of the path");
+});
+
 test("user messages are not framed by default (pi-starline owns them)", () => {
   patchContainerBoxes({ user: "userCol", custom: "customCol" });
   const component = new UserMessageComponent("hello" as never);

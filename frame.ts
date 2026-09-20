@@ -76,6 +76,48 @@ function fingerprint(lines: string[]): string {
 
 const ANSI_RE = /\x1b\[[0-9;:?]*[ -/]*[@-~]/g;
 
+/** CSI and OSC (BEL- or ST-terminated) escape sequences. */
+const ESCAPE_RE = /\x1b(?:\[[0-9;:?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?)/g;
+
+/**
+ * Find `needle` in the row's *visible* text and return the raw string index
+ * of that occurrence — never inside an escape sequence. pi hyperlinks file
+ * paths (OSC 8), so a naive indexOf hits the invisible `file://` URL first
+ * and would inject the icon into the escape sequence itself.
+ */
+function visibleIndexOf(row: string, needle: string): number {
+  let plain = "";
+  const map: number[] = [];
+  let last = 0;
+  for (const m of row.matchAll(ESCAPE_RE)) {
+    for (let j = last; j < m.index; j++) {
+      map.push(j);
+      plain += row[j];
+    }
+    last = m.index + m[0].length;
+  }
+  for (let j = last; j < row.length; j++) {
+    map.push(j);
+    plain += row[j];
+  }
+  const pi = plain.lastIndexOf(needle);
+  return pi >= 0 ? map[pi] : -1;
+}
+
+/**
+ * When `idx` sits inside an OSC 8 hyperlink (opener before it, no closer in
+ * between), return the opener's start so the icon lands outside the link.
+ * Otherwise return `idx` unchanged.
+ */
+function outsideHyperlink(row: string, idx: number): number {
+  const opener = row.lastIndexOf("\x1b]8;;", idx);
+  if (opener < 0) return idx;
+  const after = row[opener + 6];
+  if (after === "\x07" || after === "\x1b") return idx; // that's a closer
+  const closer = Math.max(row.lastIndexOf("\x1b]8;;\x07", idx), row.lastIndexOf("\x1b]8;;\x1b\\", idx));
+  return opener > closer ? opener : idx;
+}
+
 /** A padding row from pi's default shell: spaces plus background escapes. */
 function isBlankRow(line: string): boolean {
   return line.replace(ANSI_RE, "").trim() === "";
@@ -217,10 +259,13 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
       if (icons && content.length > 0) {
         let row = kindPrefix + content[0];
         if (fileGlyph) {
-          const idx = row.indexOf(filePath);
+          const idx = visibleIndexOf(row, filePath);
           row =
             idx >= 0
-              ? row.slice(0, idx) + fileGlyph + " " + row.slice(idx)
+              ? (() => {
+                  const at = outsideHyperlink(row, idx);
+                  return row.slice(0, at) + fileGlyph + " " + row.slice(at);
+                })()
               : kindPrefix + fileGlyph + " " + content[0];
         }
         content[0] = row;
