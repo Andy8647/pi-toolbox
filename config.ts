@@ -34,10 +34,11 @@ const DEFAULT_TOOL_COLORS: Record<string, string> = {
   bash: "bashMode",
   read: "toolTitle",
   edit: "syntaxVariable",
-  write: "syntaxType",
+  write: "syntaxVariable",
   grep: "syntaxOperator",
   find: "syntaxOperator",
   ls: "syntaxOperator",
+  mcp: "customMessageLabel",
 };
 
 const DEFAULTS: ToolboxConfig = {

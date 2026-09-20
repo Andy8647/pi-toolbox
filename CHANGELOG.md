@@ -18,9 +18,10 @@ styling.
 
 **Tool boxes can take per-tool border colors and Nerd Font icons.** A
 successful box uses its tool's configured color instead of green (pending
-stays grey, errors stay red), and every box's call row gets a kind icon —
-file tools additionally show the target file's nvim-web-devicons glyph
-(`read foo.ts` renders an eye plus the TypeScript icon).
+stays grey, errors stay red, unlisted tools take the theme accent), and every
+box's call row leads with a kind icon — file tools put the target file's
+nvim-web-devicons glyph right in front of the path (`write /tmp/x.ts`
+renders `  write 󰛦 /tmp/x.ts`).
 
 New settings under `toolbox`: `frameMessages` (default `true`) toggles the
 message frames; `frameUserMessages` (default `false`) opts user messages in

@@ -28,12 +28,12 @@ patchToolBoxFrames({
 function fakeToolBox(
   toolName: string,
   args: unknown,
-  state: { isPartial?: boolean; isError?: boolean } = {},
+  state: { isPartial?: boolean; isError?: boolean; callRow?: string } = {},
 ): { render(width: number): string[] } {
   const component = Object.create(ToolExecutionComponent.prototype);
   component.hideComponent = false;
   component.hasRendererDefinition = () => false;
-  component.contentText = new Text(`${toolName} doing things`, 0, 0);
+  component.contentText = new Text(state.callRow ?? `${toolName} doing things`, 0, 0);
   component.isPartial = state.isPartial ?? false;
   component.result = { isError: state.isError ?? false };
   component.expanded = false;
@@ -44,12 +44,23 @@ function fakeToolBox(
   return component;
 }
 
-test("successful read gets its tool color and both icons", () => {
-  const lines = fakeToolBox("read", { path: "src/index.ts" }).render(60);
+test("successful read gets its tool color, with icons ordered kind → name → file → path", () => {
+  const lines = fakeToolBox("read", { path: "src/index.ts" }, { callRow: "read src/index.ts" }).render(60);
   assert.match(lines[1], /^<fg:readCol>╭─+╮<\/fg>$/, "border in the tool color");
-  assert.ok(lines[2].includes("\u{f06e}"), "read (eye) kind icon");
-  assert.ok(lines[2].includes("\u{f06e6}"), "TypeScript file icon (nvim-web-devicons)");
-  assert.ok(lines[2].includes("read doing things"), "call row kept");
+  const row = lines[2];
+  const kindIdx = row.indexOf("\u{f06e}");
+  const nameIdx = row.indexOf("read", kindIdx); // skip the <fg:readCol> tag
+  const fileIdx = row.indexOf("\u{f06e6}");
+  const pathIdx = row.indexOf("src/index.ts");
+  assert.ok(kindIdx >= 1, "kind icon has a leading space off the border");
+  assert.ok(kindIdx < nameIdx && nameIdx < fileIdx && fileIdx < pathIdx, "kind → name → file → path order");
+});
+
+test("file icon falls back into the prefix when the path is not in the call row", () => {
+  const lines = fakeToolBox("read", { path: "src/index.ts" }).render(60);
+  const row = lines[2];
+  assert.ok(row.indexOf("\u{f06e}") < row.indexOf("\u{f06e6}"), "kind icon before file icon");
+  assert.ok(row.indexOf("\u{f06e6}") < row.indexOf("read doing things"), "file icon still leads the row");
 });
 
 test("successful bash gets its tool color and the terminal icon", () => {
@@ -68,9 +79,9 @@ test("pending stays muted even for a colored tool", () => {
   assert.match(lines[1], /^<fg:borderMuted>╭─+╮<\/fg>$/);
 });
 
-test("unlisted tool falls back to the success color and the wrench icon", () => {
+test("unlisted tool falls back to the accent color and the wrench icon", () => {
   const lines = fakeToolBox("mcp_server_thing", {}).render(60);
-  assert.match(lines[1], /^<fg:success>╭─+╮<\/fg>$/);
+  assert.match(lines[1], /^<fg:accent>╭─+╮<\/fg>$/);
   assert.ok(lines[2].includes("\u{f0ad}"), "default wrench icon");
 });
 

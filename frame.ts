@@ -24,7 +24,7 @@ import {
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
 import { getTheme, type ThemeLike } from "./theme-access.ts";
-import { MESSAGE_ICONS, toolIconPrefix } from "./icons.ts";
+import { fileIcon, MESSAGE_ICONS, PATH_ARG_TOOLS, toolKindIcon } from "./icons.ts";
 
 // Solid background fills: truecolor/256 "48;…" sequences and the standard
 // 40-47 / 100-107 bg colors. pi's shell and some built-in renderers (edit)
@@ -158,10 +158,26 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
         : this.getRenderShell() === "self"
           ? this.selfRenderContainer
           : this.contentBox;
-      // The icon prefix takes cells off the call row; rendering the source
-      // narrower keeps every line lossless instead of truncating the frame.
-      const iconPrefix = icons ? `${toolIconPrefix(this.toolName, this.args)} ` : "";
-      const iconCells = iconPrefix ? visibleWidth(iconPrefix) : 0;
+      // The icon cells come off the call row's render width so nothing
+      // truncates. Layout: ` <kind> write <file> /tmp/x.ts` — the kind icon
+      // leads, the file-type icon sits directly in front of the path (the
+      // same role `$` plays for bash). When the path can't be located in
+      // the rendered row, the file icon falls back into the prefix.
+      let kindPrefix = "";
+      let fileGlyph = "";
+      let filePath = "";
+      if (icons) {
+        kindPrefix = ` ${toolKindIcon(this.toolName)} `;
+        if (PATH_ARG_TOOLS.has(this.toolName)) {
+          const p = (this.args as { path?: unknown } | undefined)?.path;
+          if (typeof p === "string" && p) {
+            fileGlyph = fileIcon(p);
+            filePath = p;
+          }
+        }
+      }
+      const iconCells =
+        (kindPrefix ? visibleWidth(kindPrefix) : 0) + (fileGlyph ? visibleWidth(fileGlyph) + 1 : 0);
       const raw = source.render(w - 2 - iconCells);
 
       // The whole returned array is cached, not just the framed body.
@@ -171,12 +187,12 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
       //
       // Border color tracks tool state, then per-tool identity: pending is
       // grey and error is red no matter what; a successful box takes its
-      // tool's configured color, falling back to green.
+      // tool's configured color, falling back to the theme accent.
       const color = this.isPartial
         ? "borderMuted"
         : this.result?.isError
           ? "error"
-          : toolColors[this.toolName] || "success";
+          : toolColors[this.toolName] || "accent";
       const fp = fingerprint(raw);
       // Image boxes skip the cache entirely: the text fingerprint says nothing
       // about an image component being swapped in (kitty PNG conversion
@@ -198,8 +214,16 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
       // pi's default shell pads content by one cell on every side; the frame
       // supplies the vertical part, so only the blank padding rows are dropped.
       const content = trimBlankEdges(raw);
-      if (iconPrefix && content.length > 0) {
-        content[0] = `${iconPrefix}${content[0]}`;
+      if (icons && content.length > 0) {
+        let row = kindPrefix + content[0];
+        if (fileGlyph) {
+          const idx = row.indexOf(filePath);
+          row =
+            idx >= 0
+              ? row.slice(0, idx) + fileGlyph + " " + row.slice(idx)
+              : kindPrefix + fileGlyph + " " + content[0];
+        }
+        content[0] = row;
       }
       // An expanded box gets a collapse anchor as its last content row. pi
       // itself only renders an expand hint, and only while collapsed, for the
@@ -376,7 +400,7 @@ export function patchContainerBoxes(
         const raw = box.render(icons ? w - 4 : w - 2).map(stripBackgroundFills);
         const content = trimBlankEdges(raw);
         if (content.length === 0) return [];
-        if (icons) content[0] = `${icon} ${content[0]}`;
+        if (icons) content[0] = ` ${icon} ${content[0].replace(/^ +/, "")}`;
 
         const fp = fingerprint(content);
         const sample = theme.fg(borderColor, "·");

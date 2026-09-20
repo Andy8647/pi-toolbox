@@ -8,7 +8,7 @@ Rounded transparent tool boxes with syntax highlighting for [pi](https://github.
 - **Every tool box** — built-in tools, MCP calls (pi-mcp-adapter), subagents, and any other extension's tools all get the same frame
 - **Every message box** — compaction and branch summaries, skill invocations, and extension custom messages get the same frame, each kind in its own border color (user messages are left to pi-starline by default)
 - **Per-tool border colors** — successful boxes take their tool's color (bash/read/edit/write/… configurable); pending stays grey, errors stay red
-- **Nerd Font icons** — every box gets a kind icon; file tools additionally show the target file's nvim-web-devicons glyph (`read foo.ts` → eye + TypeScript icon)
+- **Nerd Font icons** — every box gets a kind icon; file tools show the target file's nvim-web-devicons glyph right in front of the path (`write /tmp/x.ts` renders `  write 󰛦 /tmp/x.ts`)
 - **Transparent background** — no solid background fill, works with terminal transparency
 - **Status-aware border colors** — grey while executing, green on success, red on error
 - **Bash syntax highlighting** — commands get token-level coloring (commands, flags, strings, variables, operators, etc.)
@@ -57,10 +57,11 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
       "bash": "bashMode",
       "read": "toolTitle",
       "edit": "syntaxVariable",
-      "write": "syntaxType",
+      "write": "syntaxVariable",
       "grep": "syntaxOperator",
       "find": "syntaxOperator",
-      "ls": "syntaxOperator"
+      "ls": "syntaxOperator",
+      "mcp": "customMessageLabel"
     },
     "messageBorderColors": {
       "user": "toolTitle",
@@ -81,7 +82,7 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
 | `frameMessages` | boolean | `true` | Frame compaction/branch/skill/custom-message boxes like tool boxes |
 | `frameUserMessages` | boolean | `false` | Also frame user messages — off by default because pi-starline already restyles `UserMessageComponent`, and two render patches on one prototype fight over the output. Enable only without pi-starline |
 | `icons` | boolean | `true` | Nerd Font icons on every box. Requires a Nerd Font; set `false` otherwise |
-| `toolColors` | object | see above | Border color per tool name for successful executions (pending stays grey, errors stay red). When set, the map **replaces** the defaults — `{}` disables per-tool colors |
+| `toolColors` | object | see above | Border color per tool name for successful executions (pending stays grey, errors stay red, unlisted tools take `accent`). When set, the map **replaces** the defaults — `{}` disables per-tool colors |
 | `messageBorderColors` | object | see above | Per-kind message-box border colors; merged over the defaults |
 
 All color values are theme fg color names (`ThemeColor`), so they follow the

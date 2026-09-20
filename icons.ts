@@ -193,20 +193,11 @@ export const TOOL_ICONS: Record<string, string> = {
 export const DEFAULT_TOOL_ICON = "\u{f0ad}"; // fa-wrench
 
 /** Tools whose args carry a file path that deserves a file-type icon. */
-const PATH_ARG_TOOLS = new Set(["read", "edit", "write"]);
+export const PATH_ARG_TOOLS = new Set(["read", "edit", "write"]);
 
-/**
- * Icon prefix for a tool call row: the tool-kind glyph, and for file tools
- * the target file's type glyph after it — e.g. `\uf06e \ue628` for
- * `read foo.ts`.
- */
-export function toolIconPrefix(toolName: string, args: unknown): string {
-	const kind = TOOL_ICONS[toolName] ?? DEFAULT_TOOL_ICON;
-	if (PATH_ARG_TOOLS.has(toolName)) {
-		const path = (args as { path?: unknown } | undefined)?.path;
-		if (typeof path === "string" && path) return `${kind} ${fileIcon(path)}`;
-	}
-	return kind;
+/** Kind icon for a tool: its configured glyph or the generic wrench. */
+export function toolKindIcon(toolName: string): string {
+	return TOOL_ICONS[toolName] ?? DEFAULT_TOOL_ICON;
 }
 
 // ── Message boxes ───────────────────────────────────────────────────────
