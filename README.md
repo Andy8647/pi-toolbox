@@ -6,6 +6,7 @@ Rounded transparent tool boxes with syntax highlighting for [pi](https://github.
 
 - **Rounded borders** — ╭╮╰╯ box drawing instead of pi's default ┌┐└┘
 - **Every tool box** — built-in tools, MCP calls (pi-mcp-adapter), subagents, and any other extension's tools all get the same frame
+- **Every message box** — user messages, compaction and branch summaries, skill invocations, and extension custom messages get the same frame in a distinct border color (default: `accent`)
 - **Transparent background** — no solid background fill, works with terminal transparency
 - **Status-aware border colors** — grey while executing, green on success, red on error
 - **Bash syntax highlighting** — commands get token-level coloring (commands, flags, strings, variables, operators, etc.)
@@ -46,7 +47,9 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
   "toolbox": {
     "enabled": true,
     "highlightBash": true,
-    "collapseAnchor": true
+    "collapseAnchor": true,
+    "frameMessages": true,
+    "messageBorderColor": "accent"
   }
 }
 ```
@@ -56,14 +59,21 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
 | `enabled` | boolean | `true` | Enable/disable the extension |
 | `highlightBash` | boolean | `true` | Syntax-highlight bash commands |
 | `collapseAnchor` | boolean | `true` | Show a `(ctrl+o to collapse)` row at the bottom of expanded tool boxes |
+| `frameMessages` | boolean | `true` | Frame user/compaction/branch/skill/custom-message boxes like tool boxes |
+| `messageBorderColor` | string | `"accent"` | Theme fg color for message-box borders (any `ThemeColor` name) |
 
 ## How it works
 
 pi builds one `ToolExecutionComponent` per tool call, no matter which extension
 registered the tool. The extension API cannot wrap another extension's
 renderers, so pi-toolbox patches that component's `render` instead — which is
-why MCP and subagent boxes are framed too. Only `bash` is re-registered, purely
-to add syntax highlighting to the command row.
+why MCP and subagent boxes are framed too. Message boxes (compaction, branch
+summary, skill invocation, user message, extension custom message) never go
+through that component; their own prototypes get the same treatment, with two
+exceptions that keep their native styling: custom messages rendered by an
+extension-provided renderer, and `!` bash-mode executions, which already draw
+their own border. Only `bash` is re-registered, purely to add syntax
+highlighting to the command row.
 
 An unchanged box returns its cached line array outright, because a compositor
 like [pi-powerline-footer](https://github.com/Andy8647/pi-powerline-footer)'s

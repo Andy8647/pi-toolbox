@@ -6,12 +6,18 @@ export interface ToolboxConfig {
   highlightBash: boolean;
   /** Append a `(ctrl+o to collapse)` anchor row to expanded tool boxes. */
   collapseAnchor: boolean;
+  /** Give compaction/branch-summary boxes the same rounded transparent frame. */
+  frameMessages: boolean;
+  /** Theme fg color for message-box borders (any ThemeColor name). */
+  messageBorderColor: string;
 }
 
 const DEFAULTS: ToolboxConfig = {
   enabled: true,
   highlightBash: true,
   collapseAnchor: true,
+  frameMessages: true,
+  messageBorderColor: "accent",
 };
 
 function readSettings(): any {
@@ -26,6 +32,8 @@ export function loadConfig(): ToolboxConfig {
       enabled: toolbox?.enabled ?? DEFAULTS.enabled,
       highlightBash: toolbox?.highlightBash ?? DEFAULTS.highlightBash,
       collapseAnchor: toolbox?.collapseAnchor ?? DEFAULTS.collapseAnchor,
+      frameMessages: toolbox?.frameMessages ?? DEFAULTS.frameMessages,
+      messageBorderColor: toolbox?.messageBorderColor ?? DEFAULTS.messageBorderColor,
     };
   } catch {
     return { ...DEFAULTS };

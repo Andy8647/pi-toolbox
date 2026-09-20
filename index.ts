@@ -9,18 +9,20 @@
  *   enabled: boolean        — enable/disable the extension (default: true)
  *   highlightBash: boolean  — syntax-highlight bash commands (default: true)
  *   collapseAnchor: boolean — `(ctrl+o to collapse)` row on expanded boxes (default: true)
+ *   frameMessages: boolean  — rounded frame on message boxes (default: true)
+ *   messageBorderColor: string — theme fg color for message-box borders (default: "accent")
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { formatBashCallHighlighted } from "./bash-highlight.ts";
-import { patchToolBoxFrames } from "./frame.ts";
+import { patchContainerBoxes, patchMessageBoxes, patchToolBoxFrames } from "./frame.ts";
 import { loadConfig } from "./config.ts";
 import type { ThemeLike } from "./theme-access.ts";
 
 export { highlightBashCommand, formatBashCallHighlighted } from "./bash-highlight.ts";
-export { stripBackgroundFills, patchToolBoxFrames } from "./frame.ts";
+export { stripBackgroundFills, patchContainerBoxes, patchMessageBoxes, patchToolBoxFrames } from "./frame.ts";
 
 interface BashRenderState {
   startedAt?: number;
@@ -78,6 +80,15 @@ export default function (pi: ExtensionAPI): void {
     patchToolBoxFrames(config.collapseAnchor);
   } catch (error) {
     console.debug("[pi-toolbox] tool box frame patch failed:", error);
+  }
+
+  if (config.frameMessages) {
+    try {
+      patchMessageBoxes(config.messageBorderColor, config.collapseAnchor);
+      patchContainerBoxes(config.messageBorderColor);
+    } catch (error) {
+      console.debug("[pi-toolbox] message box frame patch failed:", error);
+    }
   }
 
   if (config.highlightBash) {

@@ -1,6 +1,6 @@
 {
   "name": "@andy8647/pi-toolbox",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "type": "module",
   "packageManager": "pnpm@11.10.0",
   "description": "Rounded transparent tool boxes for pi coding agent — frames every tool (including MCP), bash syntax highlighting, click a box to expand it alone",

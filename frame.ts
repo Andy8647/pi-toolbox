@@ -14,7 +14,15 @@
  */
 
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { keyText, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
+import {
+  BranchSummaryMessageComponent,
+  CompactionSummaryMessageComponent,
+  CustomMessageComponent,
+  keyText,
+  SkillInvocationMessageComponent,
+  ToolExecutionComponent,
+  UserMessageComponent,
+} from "@earendil-works/pi-coding-agent";
 import { getTheme, type ThemeLike } from "./theme-access.ts";
 
 // Solid background fills: truecolor/256 "48;…" sequences and the standard
@@ -195,4 +203,143 @@ export function patchToolBoxFrames(collapseAnchor = true): void {
       return originalRender.call(this, width);
     }
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Message boxes (compaction / branch summary)
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface MessageBoxInternals {
+  children: Array<{ render(width: number): string[] }>;
+  expanded: boolean;
+  render(width: number): string[];
+  __msgFrameCache?: { width: number; fp: string; sample: string; out: string[] };
+}
+
+/**
+ * Compaction and branch-summary boxes are plain `Box`es with a filled
+ * `customMessageBg` background — ToolExecutionComponent never sees them, so
+ * the frame patch above leaves them in pi's default style. They get the same
+ * rounded, transparent frame here, drawn in `borderColor` (default "accent")
+ * to keep them visually distinct from the tool state colors. Children are
+ * rendered directly, skipping the Box's background fill and padding, so the
+ * frame is the only chrome; on any mismatch the original Box render runs.
+ */
+export function patchMessageBoxes(borderColor = "accent", collapseAnchor = true): void {
+  for (const cls of [
+    CompactionSummaryMessageComponent,
+    BranchSummaryMessageComponent,
+    SkillInvocationMessageComponent,
+  ]) {
+    const proto = cls.prototype as unknown as MessageBoxInternals & { __toolboxFramed?: boolean };
+    if (proto.__toolboxFramed) continue;
+    proto.__toolboxFramed = true;
+
+    const originalRender = proto.render;
+
+    proto.render = function (this: MessageBoxInternals, width: number): string[] {
+      const theme = getTheme();
+      if (!theme) return originalRender.call(this, width);
+      try {
+        const w = Math.max(4, width);
+        // Frame + one cell of horizontal padding on each side.
+        const contentWidth = Math.max(1, w - 4);
+        const content: string[] = [];
+        for (const child of this.children) {
+          for (const line of child.render(contentWidth)) {
+            content.push(stripBackgroundFills(line));
+          }
+        }
+        if (content.length === 0) return [];
+        if (collapseAnchor && this.expanded) {
+          const anchor = collapseAnchorLine(theme);
+          if (anchor) content.push(anchor);
+        }
+        const fp = fingerprint(content);
+        // The border color escape acts as a theme sample — a theme switch
+        // with identical content must not hit the cache.
+        const sample = theme.fg(borderColor, "·");
+        const cache = this.__msgFrameCache;
+        if (cache && cache.width === w && cache.fp === fp && cache.sample === sample) return cache.out;
+        const padded = content.map((line) => ` ${line}`);
+        const out = ["", ...drawFrame(padded, w, theme, borderColor)];
+        this.__msgFrameCache = { width: w, fp, sample, out };
+        return out;
+      } catch {
+        return originalRender.call(this, width);
+      }
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Container boxes (user messages / extension custom messages)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// OSC 133 zone markers UserMessageComponent puts on its first/last line —
+// terminals use them for prompt navigation, so the framed output keeps them
+// in the same positions.
+const OSC133_ZONE_START = "\x1b]133;A\x07";
+const OSC133_ZONE_END = "\x1b]133;B\x07";
+const OSC133_ZONE_FINAL = "\x1b]133;C\x07";
+
+interface ContainerBoxInternals {
+  children: Array<{ render(width: number): string[] }>;
+  /** CustomMessageComponent's default box; absent on UserMessageComponent. */
+  box?: { render(width: number): string[] };
+  /** Set when an extension renderer supplies its own styled component. */
+  customComponent?: unknown;
+  render(width: number): string[];
+  __msgFrameCache?: { width: number; fp: string; sample: string; out: string[] };
+}
+
+/**
+ * User and extension custom messages are `Container`s whose visible box is an
+ * inner `Box` with a filled background. The frame replaces that chrome: the
+ * inner box renders one frame-width narrower, its background fills and
+ * vertical padding rows are stripped, and the rounded border takes over —
+ * the box's own horizontal padding is kept as the insets.
+ */
+export function patchContainerBoxes(borderColor = "accent"): void {
+  const patch = (cls: { prototype: unknown }, isUserMessage: boolean) => {
+    const proto = cls.prototype as ContainerBoxInternals & { __toolboxFramed?: boolean };
+    if (proto.__toolboxFramed) return;
+    proto.__toolboxFramed = true;
+
+    const originalRender = proto.render;
+
+    proto.render = function (this: ContainerBoxInternals, width: number): string[] {
+      const theme = getTheme();
+      if (!theme) return originalRender.call(this, width);
+      try {
+        // An extension's custom renderer owns its styling — never frame it.
+        if (this.customComponent) return originalRender.call(this, width);
+        const box = this.box ?? this.children[0];
+        if (!box) return originalRender.call(this, width);
+
+        const w = Math.max(4, width);
+        const raw = box.render(w - 2).map(stripBackgroundFills);
+        const content = trimBlankEdges(raw);
+        if (content.length === 0) return [];
+
+        const fp = fingerprint(content);
+        const sample = theme.fg(borderColor, "·");
+        const cache = this.__msgFrameCache;
+        if (cache && cache.width === w && cache.fp === fp && cache.sample === sample) return cache.out;
+
+        const out = ["", ...drawFrame(content, w, theme, borderColor)];
+        if (isUserMessage) {
+          out[0] = OSC133_ZONE_START + out[0];
+          out[out.length - 1] = OSC133_ZONE_END + OSC133_ZONE_FINAL + out[out.length - 1];
+        }
+        this.__msgFrameCache = { width: w, fp, sample, out };
+        return out;
+      } catch {
+        return originalRender.call(this, width);
+      }
+    };
+  };
+
+  patch(UserMessageComponent, true);
+  patch(CustomMessageComponent, false);
 }
