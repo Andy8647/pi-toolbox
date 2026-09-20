@@ -10,7 +10,9 @@
  *   highlightBash: boolean  — syntax-highlight bash commands (default: true)
  *   collapseAnchor: boolean — `(ctrl+o to collapse)` row on expanded boxes (default: true)
  *   frameMessages: boolean  — rounded frame on message boxes (default: true)
- *   messageBorderColor: string — theme fg color for message-box borders (default: "accent")
+ *   messageBorderColors: per-kind theme fg colors for message-box borders
+ *     (user/compaction/branch/skill/custom; defaults toolTitle/customMessageLabel/
+ *      mdCode/accent/warning)
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -84,8 +86,8 @@ export default function (pi: ExtensionAPI): void {
 
   if (config.frameMessages) {
     try {
-      patchMessageBoxes(config.messageBorderColor, config.collapseAnchor);
-      patchContainerBoxes(config.messageBorderColor);
+      patchMessageBoxes(config.messageBorderColors, config.collapseAnchor);
+      patchContainerBoxes(config.messageBorderColors);
     } catch (error) {
       console.debug("[pi-toolbox] message box frame patch failed:", error);
     }

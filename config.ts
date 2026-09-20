@@ -1,15 +1,23 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+export interface MessageBorderColors {
+  user: string;
+  compaction: string;
+  branch: string;
+  skill: string;
+  custom: string;
+}
+
 export interface ToolboxConfig {
   enabled: boolean;
   highlightBash: boolean;
   /** Append a `(ctrl+o to collapse)` anchor row to expanded tool boxes. */
   collapseAnchor: boolean;
-  /** Give compaction/branch-summary boxes the same rounded transparent frame. */
+  /** Give message boxes the same rounded transparent frame as tool boxes. */
   frameMessages: boolean;
-  /** Theme fg color for message-box borders (any ThemeColor name). */
-  messageBorderColor: string;
+  /** Per-kind theme fg colors for message-box borders (any ThemeColor name). */
+  messageBorderColors: MessageBorderColors;
 }
 
 const DEFAULTS: ToolboxConfig = {
@@ -17,7 +25,13 @@ const DEFAULTS: ToolboxConfig = {
   highlightBash: true,
   collapseAnchor: true,
   frameMessages: true,
-  messageBorderColor: "accent",
+  messageBorderColors: {
+    user: "toolTitle",
+    compaction: "customMessageLabel",
+    branch: "mdCode",
+    skill: "accent",
+    custom: "warning",
+  },
 };
 
 function readSettings(): any {
@@ -33,7 +47,10 @@ export function loadConfig(): ToolboxConfig {
       highlightBash: toolbox?.highlightBash ?? DEFAULTS.highlightBash,
       collapseAnchor: toolbox?.collapseAnchor ?? DEFAULTS.collapseAnchor,
       frameMessages: toolbox?.frameMessages ?? DEFAULTS.frameMessages,
-      messageBorderColor: toolbox?.messageBorderColor ?? DEFAULTS.messageBorderColor,
+      messageBorderColors: {
+        ...DEFAULTS.messageBorderColors,
+        ...toolbox?.messageBorderColors,
+      },
     };
   } catch {
     return { ...DEFAULTS };

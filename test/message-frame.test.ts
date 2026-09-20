@@ -29,26 +29,35 @@ const { Text } = await import("@earendil-works/pi-tui");
 
 const BG_FILL_RE = /\x1b\[48;[0-9;]*m|\x1b\[(?:4[0-7]|10[0-7])m/;
 
+// One distinct fake color per message-box kind — assertions key off these.
+const COLORS = {
+  user: "userCol",
+  compaction: "compCol",
+  branch: "branchCol",
+  skill: "skillCol",
+  custom: "customCol",
+};
+
 function fakeMessage() {
   return { tokensBefore: 357695, summary: "summary text" } as any;
 }
 
-for (const [name, Component, arg] of [
-  ["compaction", CompactionSummaryMessageComponent, fakeMessage()],
-  ["branch summary", BranchSummaryMessageComponent, fakeMessage()],
-  ["skill invocation", SkillInvocationMessageComponent, { name: "demo", content: "skill text" }],
+for (const [name, Component, arg, color] of [
+  ["compaction", CompactionSummaryMessageComponent, fakeMessage(), COLORS.compaction],
+  ["branch summary", BranchSummaryMessageComponent, fakeMessage(), COLORS.branch],
+  ["skill invocation", SkillInvocationMessageComponent, { name: "demo", content: "skill text" }, COLORS.skill],
 ] as const) {
-  test(`${name} box gets a rounded transparent accent frame`, () => {
-    patchMessageBoxes("accent", true);
+  test(`${name} box gets a rounded transparent frame in its own color`, () => {
+    patchMessageBoxes(COLORS, true);
     const component = new (Component as any)(arg);
     const lines: string[] = component.render(60);
 
     assert.ok(lines.length >= 4, "blank spacer + frame top + content + frame bottom");
-    assert.match(lines[1], /^<fg:accent>╭─+╮<\/fg>$/, "rounded top border in accent");
-    assert.match(lines.at(-1)!, /^<fg:accent>╰─+╯<\/fg>$/, "rounded bottom border in accent");
+    assert.match(lines[1], new RegExp(`^<fg:${color}>╭─+╮</fg>$`), "rounded top border in kind color");
+    assert.match(lines.at(-1)!, new RegExp(`^<fg:${color}>╰─+╯</fg>$`), "rounded bottom border in kind color");
     for (const line of lines.slice(2, -1)) {
-      assert.match(line, /^<fg:accent>│<\/fg>/, "left border");
-      assert.match(line, /<fg:accent>│<\/fg>$/, "right border");
+      assert.match(line, new RegExp(`^<fg:${color}>│</fg>`), "left border");
+      assert.match(line, new RegExp(`<fg:${color}>│</fg>$`), "right border");
     }
     const body = lines.join("\n");
     assert.ok(
@@ -61,42 +70,42 @@ for (const [name, Component, arg] of [
 }
 
 test("expanded compaction box renders its summary inside the frame", () => {
-  patchMessageBoxes("accent", true);
+  patchMessageBoxes(COLORS, true);
   const component = new CompactionSummaryMessageComponent(fakeMessage() as any);
   component.setExpanded(true);
   const lines: string[] = component.render(60);
   const body = lines.join("\n");
-  assert.match(lines[1], /^<fg:accent>╭─+╮<\/fg>$/, "still framed when expanded");
+  assert.match(lines[1], new RegExp(`^<fg:${COLORS.compaction}>╭─+╮</fg>$`), "still framed when expanded");
   assert.ok(body.includes("summary text"), "summary kept");
   // The collapse anchor is only rendered when a key is bound to
   // app.tools.expand — outside a real session keyText() is empty by design.
 });
 
-test("user message gets a frame and keeps its OSC133 zone markers", () => {
-  patchContainerBoxes("accent");
+test("user message gets a frame in the user color and keeps its OSC133 zone markers", () => {
+  patchContainerBoxes(COLORS);
   const component = new UserMessageComponent("hello **world**" as never);
   const lines: string[] = component.render(60);
 
   assert.match(lines[0], /^\x1b\]133;A\x07/, "zone start on first line");
   assert.match(lines.at(-1)!, /^\x1b\]133;B\x07\x1b\]133;C\x07/, "zone end+final on last line");
-  assert.ok(lines.some((l) => l.includes("╭")), "rounded top border present");
-  assert.ok(lines.some((l) => l.includes("╰")), "rounded bottom border present");
+  assert.ok(lines.some((l) => l.includes(`<fg:${COLORS.user}>╭`)), "rounded top border in user color");
+  assert.ok(lines.some((l) => l.includes(`<fg:${COLORS.user}>╰`)), "rounded bottom border in user color");
   assert.ok(lines.join("\n").includes("hello"), "content kept");
   assert.ok(!BG_FILL_RE.test(lines.join("\n")), "no background fill escapes");
 });
 
-test("custom message with default rendering gets a frame", () => {
-  patchContainerBoxes("accent");
+test("custom message with default rendering gets a frame in the custom color", () => {
+  patchContainerBoxes(COLORS);
   const component = new CustomMessageComponent({ customType: "notice", content: "pay attention" } as any);
   const lines: string[] = component.render(60);
-  assert.ok(lines.some((l) => l.includes("╭")), "rounded top border present");
+  assert.ok(lines.some((l) => l.includes(`<fg:${COLORS.custom}>╭`)), "rounded top border in custom color");
   const body = lines.join("\n");
   assert.ok(body.includes("[notice]"), "label kept");
   assert.ok(body.includes("pay attention"), "content kept");
 });
 
 test("custom message with an extension renderer is left alone", () => {
-  patchContainerBoxes("accent");
+  patchContainerBoxes(COLORS);
   const renderer = () => new Text("extension-owned styling", 0, 0);
   const component = new CustomMessageComponent(
     { customType: "fancy", content: "ignored" } as any,
@@ -108,7 +117,7 @@ test("custom message with an extension renderer is left alone", () => {
 });
 
 test("unknown border color falls back to the original render", () => {
-  patchMessageBoxes("accent", true);
+  patchMessageBoxes(COLORS, true);
   const component = new CompactionSummaryMessageComponent(fakeMessage() as any);
   (globalThis as any)[THEME_KEY] = {
     fg: () => {

@@ -3,6 +3,26 @@
 What changed in each released version of pi-toolbox. Versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-09-19
+
+### Added
+
+**Message boxes get the same rounded transparent frame as tool boxes, each
+kind in its own border color.** User messages, compaction and branch
+summaries, skill invocations, and extension custom messages previously kept
+pi's default filled-background bars, since they never go through
+`ToolExecutionComponent`. Their components are now patched the same way.
+User messages keep their OSC 133 zone markers, and custom messages rendered
+by an extension-provided renderer are left untouched — the renderer owns its
+styling.
+
+New settings under `toolbox`: `frameMessages` (default `true`) toggles the
+message frames, and `messageBorderColors` picks a border color per message
+kind — `user` (`toolTitle`), `compaction` (`customMessageLabel`), `branch`
+(`mdCode`), `skill` (`accent`), `custom` (`warning`). Values are theme fg
+color names, so they follow the active theme; tool boxes keep their
+status-driven grey/green/red.
+
 ## [0.2.3] - 2026-09-18
 
 ### Fixed

@@ -217,20 +217,24 @@ interface MessageBoxInternals {
 }
 
 /**
- * Compaction and branch-summary boxes are plain `Box`es with a filled
- * `customMessageBg` background — ToolExecutionComponent never sees them, so
- * the frame patch above leaves them in pi's default style. They get the same
- * rounded, transparent frame here, drawn in `borderColor` (default "accent")
- * to keep them visually distinct from the tool state colors. Children are
- * rendered directly, skipping the Box's background fill and padding, so the
- * frame is the only chrome; on any mismatch the original Box render runs.
+ * Compaction, branch-summary, and skill-invocation boxes are plain `Box`es
+ * with a filled `customMessageBg` background — ToolExecutionComponent never
+ * sees them, so the frame patch above leaves them in pi's default style. They
+ * get the same rounded, transparent frame here, each drawn in its own color
+ * from `borderColors` to keep them distinct from the tool state colors and
+ * from each other. Children are rendered directly, skipping the Box's
+ * background fill and padding, so the frame is the only chrome; on any
+ * mismatch the original Box render runs.
  */
-export function patchMessageBoxes(borderColor = "accent", collapseAnchor = true): void {
-  for (const cls of [
-    CompactionSummaryMessageComponent,
-    BranchSummaryMessageComponent,
-    SkillInvocationMessageComponent,
-  ]) {
+export function patchMessageBoxes(
+  borderColors: { compaction: string; branch: string; skill: string },
+  collapseAnchor = true,
+): void {
+  for (const [cls, borderColor] of [
+    [CompactionSummaryMessageComponent, borderColors.compaction],
+    [BranchSummaryMessageComponent, borderColors.branch],
+    [SkillInvocationMessageComponent, borderColors.skill],
+  ] as const) {
     const proto = cls.prototype as unknown as MessageBoxInternals & { __toolboxFramed?: boolean };
     if (proto.__toolboxFramed) continue;
     proto.__toolboxFramed = true;
@@ -300,8 +304,8 @@ interface ContainerBoxInternals {
  * vertical padding rows are stripped, and the rounded border takes over —
  * the box's own horizontal padding is kept as the insets.
  */
-export function patchContainerBoxes(borderColor = "accent"): void {
-  const patch = (cls: { prototype: unknown }, isUserMessage: boolean) => {
+export function patchContainerBoxes(borderColors: { user: string; custom: string }): void {
+  const patch = (cls: { prototype: unknown }, borderColor: string, isUserMessage: boolean) => {
     const proto = cls.prototype as ContainerBoxInternals & { __toolboxFramed?: boolean };
     if (proto.__toolboxFramed) return;
     proto.__toolboxFramed = true;
@@ -340,6 +344,6 @@ export function patchContainerBoxes(borderColor = "accent"): void {
     };
   };
 
-  patch(UserMessageComponent, true);
-  patch(CustomMessageComponent, false);
+  patch(UserMessageComponent, borderColors.user, true);
+  patch(CustomMessageComponent, borderColors.custom, false);
 }
