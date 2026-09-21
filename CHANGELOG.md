@@ -24,6 +24,14 @@ and yazi. Unknown extensions fall back to an uncolored generic file icon.
 Tool-kind icons (FA glyphs) intentionally stay uncolored; they follow the
 call row.
 
+### Changed
+
+**The call row drops the tool-name word for file tools.** With the kind
+icon in front, ` 󰛦 edit ~/x.ts` reads choppier than
+` 󰛦 ~/x.ts` — the word is redundant, so read/edit/write rows are
+just `kind icon + file icon + path`. Rows that don't start with the tool
+name are left untouched.
+
 ## [0.3.0] - 2026-09-19
 
 ### Added

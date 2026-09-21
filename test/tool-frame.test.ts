@@ -44,16 +44,19 @@ function fakeToolBox(
   return component;
 }
 
-test("successful read gets its tool color, with icons ordered kind → name → file → path", () => {
+const ESCAPE_RE = /\x1b(?:\[[0-9;:?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?)/g;
+const visible = (line: string) => line.replace(ESCAPE_RE, "").replace(/<\/?fg:[^>]*>/g, "");
+
+test("successful read gets its tool color; icons replace the tool-name word", () => {
   const lines = fakeToolBox("read", { path: "src/index.ts" }, { callRow: "read src/index.ts" }).render(60);
   assert.match(lines[1], /^<fg:readCol>╭─+╮<\/fg>$/, "border in the tool color");
-  const row = lines[2];
+  const row = visible(lines[2]);
   const kindIdx = row.indexOf("\u{f06e}");
-  const nameIdx = row.indexOf("read", kindIdx); // skip the <fg:readCol> tag
   const fileIdx = row.indexOf("\u{f06e6}");
   const pathIdx = row.indexOf("src/index.ts");
   assert.ok(kindIdx >= 1, "kind icon has a leading space off the border");
-  assert.ok(kindIdx < nameIdx && nameIdx < fileIdx && fileIdx < pathIdx, "kind → name → file → path order");
+  assert.ok(!row.includes("read"), "tool-name word removed (icon says it)");
+  assert.ok(kindIdx < fileIdx && fileIdx < pathIdx, "kind → file → path order");
 });
 
 test("file icons carry their nvim-web-devicons brand color", () => {
@@ -64,9 +67,10 @@ test("file icons carry their nvim-web-devicons brand color", () => {
 
 test("file icon falls back into the prefix when the path is not in the call row", () => {
   const lines = fakeToolBox("read", { path: "src/index.ts" }).render(60);
-  const row = lines[2];
+  const row = visible(lines[2]);
   assert.ok(row.indexOf("\u{f06e}") < row.indexOf("\u{f06e6}"), "kind icon before file icon");
-  assert.ok(row.indexOf("\u{f06e6}") < row.indexOf("read doing things"), "file icon still leads the row");
+  assert.ok(row.indexOf("\u{f06e6}") < row.indexOf("doing things"), "file icon still leads the row");
+  assert.ok(!row.includes("read"), "tool-name word removed");
 });
 
 test("successful bash gets its tool color and the terminal icon", () => {
@@ -102,11 +106,11 @@ test("file icon follows the ~-shortened display path", () => {
   const home = process.env.HOME!;
   const raw = `${home}/.pi/agent/settings.json`;
   const lines = fakeToolBox("edit", { path: raw }, { callRow: "edit ~/.pi/agent/settings.json" }).render(70);
-  const row = lines[2];
+  const row = visible(lines[2]);
   const fileIdx = row.indexOf("\ue60b"); // json glyph
   assert.ok(fileIdx >= 0, "json icon present");
   assert.ok(fileIdx < row.indexOf("~/.pi/agent"), "icon sits in front of the ~ path");
-  assert.ok(row.indexOf("edit") < fileIdx, "icon comes after the tool name, not in the prefix");
+  assert.ok(!row.includes("edit"), "tool-name word removed");
 });
 
 test("file icon lands outside the OSC 8 hyperlink, never inside its URL", () => {
@@ -122,13 +126,11 @@ test("file icon lands outside the OSC 8 hyperlink, never inside its URL", () => 
 
   assert.ok(row.includes(opener), "hyperlink opener intact");
   assert.ok(!opener.includes("\u{f06e6}"), "URL not polluted by the icon");
-  const visible = row.replace(
-    /\x1b(?:\[[0-9;:?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?)/g,
-    "",
-  );
-  const fileIdx = visible.indexOf("\u{f06e6}");
+  const vis = visible(row);
+  const fileIdx = vis.indexOf("\u{f06e6}");
   assert.ok(fileIdx >= 0, "file icon visible");
-  assert.ok(fileIdx < visible.indexOf(path), "icon sits in front of the path");
+  assert.ok(fileIdx < vis.indexOf(path), "icon sits in front of the path");
+  assert.ok(!vis.includes("write"), "tool-name word removed");
 });
 
 test("user messages are not framed by default (pi-starline owns them)", () => {

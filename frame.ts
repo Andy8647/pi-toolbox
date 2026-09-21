@@ -80,13 +80,8 @@ const ANSI_RE = /\x1b\[[0-9;:?]*[ -/]*[@-~]/g;
 /** CSI and OSC (BEL- or ST-terminated) escape sequences. */
 const ESCAPE_RE = /\x1b(?:\[[0-9;:?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?)/g;
 
-/**
- * Find `needle` in the row's *visible* text and return the raw string index
- * of that occurrence — never inside an escape sequence. pi hyperlinks file
- * paths (OSC 8), so a naive indexOf hits the invisible `file://` URL first
- * and would inject the icon into the escape sequence itself.
- */
-function visibleIndexOf(row: string, needle: string): number {
+/** Map a row's visible characters to their raw string indices, skipping escapes. */
+function visibleCharMap(row: string): { plain: string; map: number[] } {
   let plain = "";
   const map: number[] = [];
   let last = 0;
@@ -101,8 +96,30 @@ function visibleIndexOf(row: string, needle: string): number {
     map.push(j);
     plain += row[j];
   }
+  return { plain, map };
+}
+
+function visibleIndexOf(row: string, needle: string): number {
+  const { plain, map } = visibleCharMap(row);
   const pi = plain.lastIndexOf(needle);
   return pi >= 0 ? map[pi] : -1;
+}
+
+/**
+ * Remove the leading tool name from a call row — with the kind icon in
+ * front, the word is redundant (`󰛦 edit ~/x.ts` reads choppier than
+ * `󰛦 ~/x.ts`). No-op when the row doesn't start with the word.
+ */
+function removeLeadingWord(line: string, word: string): string {
+  const { plain, map } = visibleCharMap(line);
+  const start = plain.search(/\S/);
+  if (start < 0 || !plain.startsWith(word, start)) return line;
+  const after = plain[start + word.length];
+  if (after !== undefined && after !== " ") return line;
+  const rawStart = map[start];
+  let rawEnd = map[start + word.length - 1] + 1;
+  if (line[rawEnd] === " ") rawEnd++;
+  return line.slice(0, rawStart) + line.slice(rawEnd);
 }
 
 /**
@@ -202,10 +219,11 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
           ? this.selfRenderContainer
           : this.contentBox;
       // The icon cells come off the call row's render width so nothing
-      // truncates. Layout: ` <kind> write <file> /tmp/x.ts` — the kind icon
-      // leads, the file-type icon sits directly in front of the path (the
-      // same role `$` plays for bash). When the path can't be located in
-      // the rendered row, the file icon falls back into the prefix.
+      // truncates. Layout: ` <kind> <file> /tmp/x.ts` — the kind icon leads
+      // (replacing the tool-name word, which is removed as redundant), the
+      // file-type icon sits directly in front of the path (the same role
+      // `$` plays for bash). When the path can't be located in the rendered
+      // row, the file icon falls back into the prefix.
       let kindPrefix = "";
       let fileGlyph = "";
       let filePath = "";
@@ -257,7 +275,13 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
       // supplies the vertical part, so only the blank padding rows are dropped.
       const content = trimBlankEdges(raw);
       if (icons && content.length > 0) {
-        let row = kindPrefix + content[0];
+        let first = content[0];
+        // The kind icon already names the tool — drop the redundant word.
+        if (PATH_ARG_TOOLS.has(this.toolName)) {
+          const stripped = removeLeadingWord(first, this.toolName);
+          if (stripped !== first) first = stripped.replace(/^ +/, "");
+        }
+        let row = kindPrefix + first;
         if (fileGlyph) {
           // renderToolPath shortens $HOME to `~` in the display text — try
           // the raw path first, then its shortened form.
@@ -275,7 +299,7 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
           row =
             at >= 0
               ? row.slice(0, at) + fileGlyph + " " + row.slice(at)
-              : kindPrefix + fileGlyph + " " + content[0];
+              : kindPrefix + fileGlyph + " " + first;
         }
         content[0] = row;
       }
