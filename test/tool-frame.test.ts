@@ -45,18 +45,20 @@ function fakeToolBox(
 }
 
 const ESCAPE_RE = /\x1b(?:\[[0-9;:?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?)/g;
-const visible = (line: string) => line.replace(ESCAPE_RE, "").replace(/<\/?fg:[^>]*>/g, "");
+const visible = (line: string) => line.replace(ESCAPE_RE, "").replace(/<\/?fg:[^>]*>/g, "").replace(/<\/fg>/g, "");
 
 test("successful read gets its tool color; icons replace the tool-name word", () => {
-  const lines = fakeToolBox("read", { path: "src/index.ts" }, { callRow: "read src/index.ts" }).render(60);
+  // Production shape: the name is wrapped in its own ANSI spans, so the
+  // separator space sits AFTER the closing escapes — naive removal leaves
+  // a double space between kind and file icons.
+  const callRow = "\x1b[38;2;137;180;250m\x1b[1mread\x1b[22m\x1b[39m src/index.ts";
+  const lines = fakeToolBox("read", { path: "src/index.ts" }, { callRow }).render(60);
   assert.match(lines[1], /^<fg:readCol>╭─+╮<\/fg>$/, "border in the tool color");
   const row = visible(lines[2]);
-  const kindIdx = row.indexOf("\u{f06e}");
-  const fileIdx = row.indexOf("\u{f06e6}");
-  const pathIdx = row.indexOf("src/index.ts");
-  assert.ok(kindIdx >= 1, "kind icon has a leading space off the border");
-  assert.ok(!row.includes("read"), "tool-name word removed (icon says it)");
-  assert.ok(kindIdx < fileIdx && fileIdx < pathIdx, "kind → file → path order");
+  assert.ok(
+    row.startsWith("│ \u{f06e} \u{f06e6} src/index.ts"),
+    `exact single-spaced layout, got ${JSON.stringify(row.trimEnd())}`,
+  );
 });
 
 test("file icons carry their nvim-web-devicons brand color", () => {

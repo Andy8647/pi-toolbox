@@ -109,6 +109,9 @@ function visibleIndexOf(row: string, needle: string): number {
  * Remove the leading tool name from a call row — with the kind icon in
  * front, the word is redundant (`󰛦 edit ~/x.ts` reads choppier than
  * `󰛦 ~/x.ts`). No-op when the row doesn't start with the word.
+ * Removes a *visible-text* range (word + one following space) so escape
+ * sequences interleaved between them (the name's style closers) can't
+ * strand a double space.
  */
 function removeLeadingWord(line: string, word: string): string {
   const { plain, map } = visibleCharMap(line);
@@ -116,9 +119,9 @@ function removeLeadingWord(line: string, word: string): string {
   if (start < 0 || !plain.startsWith(word, start)) return line;
   const after = plain[start + word.length];
   if (after !== undefined && after !== " ") return line;
+  const endPlain = after === " " ? start + word.length + 1 : start + word.length;
   const rawStart = map[start];
-  let rawEnd = map[start + word.length - 1] + 1;
-  if (line[rawEnd] === " ") rawEnd++;
+  const rawEnd = map[endPlain - 1] + 1;
   return line.slice(0, rawStart) + line.slice(rawEnd);
 }
 
