@@ -56,6 +56,12 @@ test("successful read gets its tool color, with icons ordered kind → name → 
   assert.ok(kindIdx < nameIdx && nameIdx < fileIdx && fileIdx < pathIdx, "kind → name → file → path order");
 });
 
+test("file icons carry their nvim-web-devicons brand color", () => {
+  const lines = fakeToolBox("read", { path: "src/index.ts" }, { callRow: "read src/index.ts" }).render(60);
+  // TypeScript brand color #0188d1 → truecolor escape right before the glyph.
+  assert.ok(lines[2].includes("\x1b[38;2;1;136;209m\u{f06e6}\x1b[39m"), "colored TS glyph");
+});
+
 test("file icon falls back into the prefix when the path is not in the call row", () => {
   const lines = fakeToolBox("read", { path: "src/index.ts" }).render(60);
   const row = lines[2];

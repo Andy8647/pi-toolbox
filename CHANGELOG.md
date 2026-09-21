@@ -14,6 +14,13 @@ fell back into the prefix (`✏️{} edit ~/.pi/...`) instead of sitting in
 front of the path. The matcher now tries both the raw and the `~`-shortened
 form.
 
+### Added
+
+**File icons render in their brand colors.** The nvim-web-devicons color is
+now extracted alongside the glyph and applied as a truecolor escape —
+TypeScript blue, JSON yellow, and so on, like lazyvim and yazi. Tool-kind
+icons (FA glyphs) intentionally stay uncolored; they follow the call row.
+
 ## [0.3.0] - 2026-09-19
 
 ### Added
