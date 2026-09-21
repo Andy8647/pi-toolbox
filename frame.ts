@@ -13,6 +13,7 @@
  * patching the prototype reaches every tool box in the session.
  */
 
+import { homedir } from "node:os";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
   BranchSummaryMessageComponent,
@@ -217,8 +218,7 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
             filePath = p;
           }
         }
-      }
-      const iconCells =
+      }      const iconCells =
         (kindPrefix ? visibleWidth(kindPrefix) : 0) + (fileGlyph ? visibleWidth(fileGlyph) + 1 : 0);
       const raw = source.render(w - 2 - iconCells);
 
@@ -259,13 +259,22 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
       if (icons && content.length > 0) {
         let row = kindPrefix + content[0];
         if (fileGlyph) {
-          const idx = visibleIndexOf(row, filePath);
+          // renderToolPath shortens $HOME to `~` in the display text — try
+          // the raw path first, then its shortened form.
+          const home = homedir();
+          const candidates =
+            filePath.startsWith(home) ? [filePath, `~${filePath.slice(home.length)}`] : [filePath];
+          let at = -1;
+          for (const candidate of candidates) {
+            const idx = visibleIndexOf(row, candidate);
+            if (idx >= 0) {
+              at = outsideHyperlink(row, idx);
+              break;
+            }
+          }
           row =
-            idx >= 0
-              ? (() => {
-                  const at = outsideHyperlink(row, idx);
-                  return row.slice(0, at) + fileGlyph + " " + row.slice(at);
-                })()
+            at >= 0
+              ? row.slice(0, at) + fileGlyph + " " + row.slice(at)
               : kindPrefix + fileGlyph + " " + content[0];
         }
         content[0] = row;

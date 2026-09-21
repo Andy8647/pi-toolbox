@@ -90,6 +90,19 @@ test("read without a path arg falls back to the read tool icon", () => {
   assert.ok(lines[2].includes("\u{f06e}"), "eye icon");
 });
 
+test("file icon follows the ~-shortened display path", () => {
+  // renderToolPath shortens $HOME to ~ in the display text; the raw args
+  // path never appears in the row, so the icon must match the short form.
+  const home = process.env.HOME!;
+  const raw = `${home}/.pi/agent/settings.json`;
+  const lines = fakeToolBox("edit", { path: raw }, { callRow: "edit ~/.pi/agent/settings.json" }).render(70);
+  const row = lines[2];
+  const fileIdx = row.indexOf("\ue60b"); // json glyph
+  assert.ok(fileIdx >= 0, "json icon present");
+  assert.ok(fileIdx < row.indexOf("~/.pi/agent"), "icon sits in front of the ~ path");
+  assert.ok(row.indexOf("edit") < fileIdx, "icon comes after the tool name, not in the prefix");
+});
+
 test("file icon lands outside the OSC 8 hyperlink, never inside its URL", () => {
   // Real write/read renderCall wraps the path in an ST-terminated OSC 8
   // hyperlink whose URL contains the path — a naive indexOf would inject

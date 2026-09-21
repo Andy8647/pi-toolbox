@@ -3,6 +3,17 @@
 What changed in each released version of pi-toolbox. Versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-09-20
+
+### Fixed
+
+**File icon placement for home-relative paths.** pi's `renderToolPath`
+shortens `$HOME` to `~` in the display text, so an edit on
+`~/.pi/agent/settings.json` never contained the raw args path — the icon
+fell back into the prefix (`✏️{} edit ~/.pi/...`) instead of sitting in
+front of the path. The matcher now tries both the raw and the `~`-shortened
+form.
+
 ## [0.3.0] - 2026-09-19
 
 ### Added
