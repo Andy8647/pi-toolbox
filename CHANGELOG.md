@@ -16,10 +16,13 @@ form.
 
 ### Added
 
-**File icons render in their brand colors.** The nvim-web-devicons color is
-now extracted alongside the glyph and applied as a truecolor escape —
-TypeScript blue, JSON yellow, and so on, like lazyvim and yazi. Tool-kind
-icons (FA glyphs) intentionally stay uncolored; they follow the call row.
+**File icons render in their brand colors, with full-set coverage.** The
+icon map now contains the complete nvim-web-devicons set — 736 extensions
+and 1172 special filenames — each with its brand color applied as a
+truecolor escape (TypeScript blue, Rust orange, Go cyan, ...), like lazyvim
+and yazi. Unknown extensions fall back to an uncolored generic file icon.
+Tool-kind icons (FA glyphs) intentionally stay uncolored; they follow the
+call row.
 
 ## [0.3.0] - 2026-09-19
 
