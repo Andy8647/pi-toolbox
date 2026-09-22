@@ -3,6 +3,17 @@
 What changed in each released version of pi-toolbox. Versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+**The `collapseAnchor` option and its `(ctrl+o to collapse)` row are gone.**
+The row existed because, before Pi 0.86.0, the only way to close one expanded
+box was `ctrl+o` collapsing every box at once. Pi now toggles a single tool
+box (and compaction/branch/skill message boxes) on a click anywhere in its
+content, so the anchor row is redundant. A `toolbox.collapseAnchor` key in
+`settings.json` is ignored.
+
 ## [0.3.1] - 2026-09-20
 
 ### Fixed

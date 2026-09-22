@@ -49,7 +49,6 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
   "toolbox": {
     "enabled": true,
     "highlightBash": true,
-    "collapseAnchor": true,
     "frameMessages": true,
     "frameUserMessages": false,
     "icons": true,
@@ -78,7 +77,6 @@ Add a `toolbox` key to your `~/.pi/agent/settings.json`:
 |-----|------|---------|-------------|
 | `enabled` | boolean | `true` | Enable/disable the extension |
 | `highlightBash` | boolean | `true` | Syntax-highlight bash commands |
-| `collapseAnchor` | boolean | `true` | Show a `(ctrl+o to collapse)` row at the bottom of expanded tool boxes |
 | `frameMessages` | boolean | `true` | Frame compaction/branch/skill/custom-message boxes like tool boxes |
 | `frameUserMessages` | boolean | `false` | Also frame user messages — off by default because pi-starline already restyles `UserMessageComponent`, and two render patches on one prototype fight over the output. Enable only without pi-starline |
 | `icons` | boolean | `true` | Nerd Font icons on every box. Requires a Nerd Font; set `false` otherwise |

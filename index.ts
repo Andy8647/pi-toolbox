@@ -8,7 +8,6 @@
  * Configuration (settings.json → "toolbox"):
  *   enabled: boolean        — enable/disable the extension (default: true)
  *   highlightBash: boolean  — syntax-highlight bash commands (default: true)
- *   collapseAnchor: boolean — `(ctrl+o to collapse)` row on expanded boxes (default: true)
  *   frameMessages: boolean  — rounded frame on message boxes (default: true)
  *   frameUserMessages: boolean — also frame user messages (default: false;
  *     pi-starline already restyles them and two render patches would fight)
@@ -84,7 +83,6 @@ export default function (pi: ExtensionAPI): void {
 
   try {
     patchToolBoxFrames({
-      collapseAnchor: config.collapseAnchor,
       icons: config.icons,
       toolColors: config.toolColors,
     });
@@ -94,7 +92,7 @@ export default function (pi: ExtensionAPI): void {
 
   if (config.frameMessages) {
     try {
-      patchMessageBoxes(config.messageBorderColors, config.collapseAnchor, config.icons);
+      patchMessageBoxes(config.messageBorderColors, config.icons);
       patchContainerBoxes(config.messageBorderColors, {
         icons: config.icons,
         includeUser: config.frameUserMessages,

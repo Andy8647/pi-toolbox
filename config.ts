@@ -12,8 +12,6 @@ export interface MessageBorderColors {
 export interface ToolboxConfig {
   enabled: boolean;
   highlightBash: boolean;
-  /** Append a `(ctrl+o to collapse)` anchor row to expanded tool boxes. */
-  collapseAnchor: boolean;
   /** Give message boxes the same rounded transparent frame as tool boxes. */
   frameMessages: boolean;
   /** Frame user messages too — off by default because pi-starline owns them. */
@@ -44,7 +42,6 @@ const DEFAULT_TOOL_COLORS: Record<string, string> = {
 const DEFAULTS: ToolboxConfig = {
   enabled: true,
   highlightBash: true,
-  collapseAnchor: true,
   frameMessages: true,
   frameUserMessages: false,
   icons: true,
@@ -69,7 +66,6 @@ export function loadConfig(): ToolboxConfig {
     return {
       enabled: toolbox?.enabled ?? DEFAULTS.enabled,
       highlightBash: toolbox?.highlightBash ?? DEFAULTS.highlightBash,
-      collapseAnchor: toolbox?.collapseAnchor ?? DEFAULTS.collapseAnchor,
       frameMessages: toolbox?.frameMessages ?? DEFAULTS.frameMessages,
       frameUserMessages: toolbox?.frameUserMessages ?? DEFAULTS.frameUserMessages,
       icons: toolbox?.icons ?? DEFAULTS.icons,
