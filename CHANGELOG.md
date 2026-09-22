@@ -3,7 +3,7 @@
 What changed in each released version of pi-toolbox. Versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.2] - 2026-09-22
 
 ### Removed
 

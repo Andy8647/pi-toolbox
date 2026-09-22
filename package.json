@@ -1,9 +1,9 @@
 {
   "name": "@andy8647/pi-toolbox",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "packageManager": "pnpm@11.10.0",
-  "description": "Rounded transparent tool boxes for pi coding agent — frames every tool (including MCP), bash syntax highlighting, click a box to expand it alone",
+  "description": "Rounded transparent tool boxes for pi coding agent \u2014 frames every tool (including MCP), bash syntax highlighting, click a box to expand it alone",
   "license": "MIT",
   "author": "Andy8647",
   "keywords": [
