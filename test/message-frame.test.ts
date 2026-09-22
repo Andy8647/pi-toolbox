@@ -48,7 +48,7 @@ for (const [name, Component, arg, color, icon] of [
   ["skill invocation", SkillInvocationMessageComponent, { name: "demo", content: "skill text" }, COLORS.skill, "\u{f0d0}"],
 ] as const) {
   test(`${name} box gets a rounded transparent frame in its own color`, () => {
-    patchMessageBoxes(COLORS, true, true);
+    patchMessageBoxes(COLORS, true);
     const component = new (Component as any)(arg);
     const lines: string[] = component.render(60);
 
@@ -71,15 +71,13 @@ for (const [name, Component, arg, color, icon] of [
 }
 
 test("expanded compaction box renders its summary inside the frame", () => {
-  patchMessageBoxes(COLORS, true, true);
+  patchMessageBoxes(COLORS, true);
   const component = new CompactionSummaryMessageComponent(fakeMessage() as any);
   component.setExpanded(true);
   const lines: string[] = component.render(60);
   const body = lines.join("\n");
   assert.match(lines[1], new RegExp(`^<fg:${COLORS.compaction}>╭─+╮</fg>$`), "still framed when expanded");
   assert.ok(body.includes("summary text"), "summary kept");
-  // The collapse anchor is only rendered when a key is bound to
-  // app.tools.expand — outside a real session keyText() is empty by design.
 });
 
 test("user message gets a frame in the user color and keeps its OSC133 zone markers", () => {
@@ -120,7 +118,7 @@ test("custom message with an extension renderer is left alone", () => {
 });
 
 test("unknown border color falls back to the original render", () => {
-  patchMessageBoxes(COLORS, true, true);
+  patchMessageBoxes(COLORS, true);
   const component = new CompactionSummaryMessageComponent(fakeMessage() as any);
   (globalThis as any)[THEME_KEY] = {
     fg: () => {

@@ -19,7 +19,6 @@ import {
   BranchSummaryMessageComponent,
   CompactionSummaryMessageComponent,
   CustomMessageComponent,
-  keyText,
   SkillInvocationMessageComponent,
   ToolExecutionComponent,
   UserMessageComponent,
@@ -42,31 +41,6 @@ function padToWidth(line: string, width: number): string {
   if (w === width) return line;
   if (w < width) return line + " ".repeat(width - w);
   return truncateToWidth(line, width);
-}
-
-/**
- * The `(ctrl+o to collapse)` row an expanded box shows as its last content
- * line — the same text bash boxes render natively when open
- * (bash-execution.js), built through the same `keyText` so it follows
- * whatever is bound to `app.tools.expand`. It is a truthful keyboard hint
- * for every user, and pi-starline's click-to-collapse additionally hit-tests
- * it as the anchor that closes the box. Undefined when no key is bound —
- * with nothing on screen to match, there is no anchor to show.
- */
-function collapseAnchorLine(theme: ThemeLike): string | undefined {
-  let keys = "";
-  try {
-    keys = keyText("app.tools.expand" as never);
-  } catch {
-    return undefined;
-  }
-  if (!keys) return undefined;
-  return (
-    theme.fg("muted", "(") +
-    theme.fg("dim", keys) +
-    theme.fg("muted", " to collapse") +
-    theme.fg("muted", ")")
-  );
 }
 
 /** Cheap content fingerprint — avoids O(n) line-by-line cache comparison. */
@@ -191,7 +165,6 @@ interface ToolBoxInternals {
 }
 
 export interface ToolFrameOptions {
-  collapseAnchor?: boolean;
   /** Prepend a Nerd Font icon (tool kind or target file type) to the call row. */
   icons?: boolean;
   /** Per-tool-name border color for successful executions (theme fg color names). */
@@ -199,7 +172,7 @@ export interface ToolFrameOptions {
 }
 
 export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
-  const { collapseAnchor = true, icons = false, toolColors = {} } = options;
+  const { icons = false, toolColors = {} } = options;
   const proto = ToolExecutionComponent.prototype as unknown as ToolBoxInternals & {
     render(width: number): string[];
     __toolboxFramed?: boolean;
@@ -306,15 +279,6 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
         }
         content[0] = row;
       }
-      // An expanded box gets a collapse anchor as its last content row. pi
-      // itself only renders an expand hint, and only while collapsed, for the
-      // tool types this component covers — so without this row there is no
-      // way back but ctrl+o closing every box at once.
-      if (collapseAnchor && this.expanded && content.length > 0) {
-        const anchor = collapseAnchorLine(theme);
-        if (anchor) content.push(anchor);
-      }
-
       const out: string[] = [""];
       if (content.length > 0) {
         for (const line of drawFrame(content, w, theme, color)) out.push(line);
@@ -360,7 +324,6 @@ interface MessageBoxInternals {
  */
 export function patchMessageBoxes(
   borderColors: { compaction: string; branch: string; skill: string },
-  collapseAnchor = true,
   icons = false,
 ): void {
   for (const [cls, borderColor, icon] of [
@@ -388,10 +351,6 @@ export function patchMessageBoxes(
           }
         }
         if (content.length === 0) return [];
-        if (collapseAnchor && this.expanded) {
-          const anchor = collapseAnchorLine(theme);
-          if (anchor) content.push(anchor);
-        }
         const fp = fingerprint(content);
         // The border color escape acts as a theme sample — a theme switch
         // with identical content must not hit the cache.
