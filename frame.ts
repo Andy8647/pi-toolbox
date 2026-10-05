@@ -43,10 +43,25 @@ function padToWidth(line: string, width: number): string {
   return truncateToWidth(line, width);
 }
 
-/** Cheap content fingerprint — avoids O(n) line-by-line cache comparison. */
-function fingerprint(lines: string[]): string {
-  if (lines.length === 0) return "";
-  return `${lines.length}|${lines[0]}|${lines[lines.length - 1]}`;
+/**
+ * Cache key for a rendered frame: the exact lines that were framed.
+ *
+ * A digest of (count, first line, last line) is not enough. Tool boxes are
+ * bordered by constant frame and padding rows, so a change confined to the
+ * middle — the elapsed counter ticking from `Elapsed 0.0s` to `Elapsed 1.0s` —
+ * left the digest untouched, and the box re-served the stale frame until
+ * something else (a click toggling `expanded`) invalidated the cache.
+ *
+ * `Box` and `Text` hand back the same cached line array while their content is
+ * unchanged, so in the common case this is a pointer comparison per row and
+ * allocates nothing.
+ */
+function sameLines(cached: readonly string[] | undefined, lines: readonly string[]): boolean {
+  if (!cached || cached.length !== lines.length) return false;
+  for (let i = 0; i < lines.length; i++) {
+    if (cached[i] !== lines[i]) return false;
+  }
+  return true;
 }
 
 const ANSI_RE = /\x1b\[[0-9;:?]*[ -/]*[@-~]/g;
@@ -161,7 +176,7 @@ interface ToolBoxInternals {
   imageSpacers: Array<{ render(width: number): string[] }>;
   hasRendererDefinition(): boolean;
   getRenderShell(): "default" | "self";
-  __frameCache?: { width: number; fp: string; color: string; expanded: boolean; out: string[] };
+  __frameCache?: { width: number; color: string; expanded: boolean; raw: string[]; out: string[] };
 }
 
 export interface ToolFrameOptions {
@@ -218,8 +233,8 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
 
       // The whole returned array is cached, not just the framed body.
       // pi-powerline-footer's compositor re-renders the entire root on every
-      // mouse packet while scrolling, so an unchanged box must cost a
-      // fingerprint check and nothing more — no re-copying its lines.
+      // mouse packet while scrolling, so an unchanged box must cost a key
+      // check and nothing more — no re-framing its lines.
       //
       // Border color tracks tool state, then per-tool identity: pending is
       // grey and error is red no matter what; a successful box takes its
@@ -229,27 +244,28 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
         : this.result?.isError
           ? "error"
           : toolColors[this.toolName] || "accent";
-      const fp = fingerprint(raw);
-      // Image boxes skip the cache entirely: the text fingerprint says nothing
-      // about an image component being swapped in (kitty PNG conversion
-      // finishes asynchronously and rebuilds them), so a hit would freeze the
-      // box on its pre-conversion frame.
+      // Image boxes skip the cache entirely: the line key says nothing about
+      // an image component being swapped in (kitty PNG conversion finishes
+      // asynchronously and rebuilds them), so a hit would freeze the box on
+      // its pre-conversion frame.
       const cacheable = this.imageComponents.length === 0;
       const cache = this.__frameCache;
       if (
         cacheable &&
         cache &&
         cache.width === w &&
-        cache.fp === fp &&
         cache.color === color &&
-        cache.expanded === this.expanded
+        cache.expanded === this.expanded &&
+        sameLines(cache.raw, raw)
       ) {
         return cache.out;
       }
 
       // pi's default shell pads content by one cell on every side; the frame
       // supplies the vertical part, so only the blank padding rows are dropped.
-      const content = trimBlankEdges(raw);
+      // `trimBlankEdges` returns its input when nothing was trimmed, and `Text`
+      // hands back its own cached array — never write into `raw`.
+      let content = trimBlankEdges(raw);
       if (icons && content.length > 0) {
         let first = content[0];
         // The kind icon already names the tool — drop the redundant word.
@@ -277,7 +293,7 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
               ? row.slice(0, at) + fileGlyph + " " + row.slice(at)
               : kindPrefix + fileGlyph + " " + first;
         }
-        content[0] = row;
+        content = [row, ...content.slice(1)];
       }
       const out: string[] = [""];
       if (content.length > 0) {
@@ -293,7 +309,7 @@ export function patchToolBoxFrames(options: ToolFrameOptions = {}): void {
       }
 
       if (out.length === 1) return [];
-      if (cacheable) this.__frameCache = { width: w, fp, color, expanded: this.expanded, out };
+      if (cacheable) this.__frameCache = { width: w, color, expanded: this.expanded, raw, out };
       return out;
     } catch {
       return originalRender.call(this, width);
@@ -309,7 +325,7 @@ interface MessageBoxInternals {
   children: Array<{ render(width: number): string[] }>;
   expanded: boolean;
   render(width: number): string[];
-  __msgFrameCache?: { width: number; fp: string; sample: string; out: string[] };
+  __msgFrameCache?: { width: number; sample: string; lines: string[]; out: string[] };
 }
 
 /**
@@ -351,17 +367,17 @@ export function patchMessageBoxes(
           }
         }
         if (content.length === 0) return [];
-        const fp = fingerprint(content);
         // The border color escape acts as a theme sample — a theme switch
         // with identical content must not hit the cache.
         const sample = theme.fg(borderColor, "·");
         const cache = this.__msgFrameCache;
-        if (cache && cache.width === w && cache.fp === fp && cache.sample === sample) return cache.out;
+        if (cache && cache.width === w && cache.sample === sample && sameLines(cache.lines, content))
+          return cache.out;
         const padded = content.map((line, i) =>
           icons && i === 0 ? ` ${icon} ${line}` : ` ${line}`,
         );
         const out = ["", ...drawFrame(padded, w, theme, borderColor)];
-        this.__msgFrameCache = { width: w, fp, sample, out };
+        this.__msgFrameCache = { width: w, sample, lines: content, out };
         return out;
       } catch {
         return originalRender.call(this, width);
@@ -388,7 +404,7 @@ interface ContainerBoxInternals {
   /** Set when an extension renderer supplies its own styled component. */
   customComponent?: unknown;
   render(width: number): string[];
-  __msgFrameCache?: { width: number; fp: string; sample: string; out: string[] };
+  __msgFrameCache?: { width: number; sample: string; lines: string[]; out: string[] };
 }
 
 /**
@@ -442,17 +458,17 @@ export function patchContainerBoxes(
         if (content.length === 0) return [];
         if (icons) content[0] = ` ${icon} ${content[0].replace(/^ +/, "")}`;
 
-        const fp = fingerprint(content);
         const sample = theme.fg(borderColor, "·");
         const cache = this.__msgFrameCache;
-        if (cache && cache.width === w && cache.fp === fp && cache.sample === sample) return cache.out;
+        if (cache && cache.width === w && cache.sample === sample && sameLines(cache.lines, content))
+          return cache.out;
 
         const out = ["", ...drawFrame(content, w, theme, borderColor)];
         if (isUserMessage) {
           out[0] = OSC133_ZONE_START + out[0];
           out[out.length - 1] = OSC133_ZONE_END + OSC133_ZONE_FINAL + out[out.length - 1];
         }
-        this.__msgFrameCache = { width: w, fp, sample, out };
+        this.__msgFrameCache = { width: w, sample, lines: content, out };
         return out;
       } catch {
         return originalRender.call(this, width);

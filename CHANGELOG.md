@@ -3,6 +3,24 @@
 What changed in each released version of pi-toolbox. Versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-10-05
+
+### Fixed
+
+**A running tool box no longer freezes on a stale frame.** The frame cache
+keyed on `(line count, first line, last line)`; tool boxes are bordered by
+constant frame and padding rows, so any change confined to the middle left the
+key untouched. A `sleep 580` bash call kept showing `Elapsed 0.0s` until
+something else — a click expanding the box — invalidated the cache. The same
+hole hid streaming output that stayed on the same number of lines. The cache
+now compares the lines it framed, which costs a pointer comparison per row
+while `Box`/`Text` hand back their cached arrays. The message and container box
+caches, which shared the fingerprint helper, were made sound the same way.
+
+Also: framing no longer writes into the line array `Text` returns from its
+cache (`content[0] = row` on an untrimmed array duplicated the kind icon on the
+next render).
+
 ## [0.3.2] - 2026-09-22
 
 ### Removed

@@ -135,6 +135,34 @@ test("file icon lands outside the OSC 8 hyperlink, never inside its URL", () => 
   assert.ok(!vis.includes("write"), "tool-name word removed");
 });
 
+test("interior-only changes are not served from the frame cache (elapsed timer)", () => {
+  // A running bash box renders the elapsed row between the call row and a
+  // trailing blank line, so line count, first line and last line are all
+  // identical while the value changes every second. A fingerprint keyed on
+  // those three served the stale frame — the box froze on "Elapsed 0.0s"
+  // until something else (a click expanding it) invalidated the cache.
+  const box = fakeToolBox("bash", { command: "sleep 580" }, {
+    isPartial: true,
+    callRow: "$ sleep 580\nElapsed 0.0s\n",
+  }) as unknown as { render(width: number): string[]; contentText: { setText(text: string): void } };
+
+  const first = box.render(60);
+  assert.ok(visible(first.join("\n")).includes("Elapsed 0.0s"), "initial frame");
+
+  box.contentText.setText("$ sleep 580\nElapsed 1.0s\n");
+  const second = box.render(60);
+
+  assert.notDeepEqual(second, first, "a content change must produce a new frame");
+  assert.ok(visible(second.join("\n")).includes("Elapsed 1.0s"), "second frame shows the new elapsed value");
+});
+
+test("an unchanged box still hits the cache (no re-framing)", () => {
+  const box = fakeToolBox("bash", { command: "ls" });
+  const first = box.render(60);
+  const second = box.render(60);
+  assert.strictEqual(second, first, "same array instance returned on a hit");
+});
+
 test("user messages are not framed by default (pi-starline owns them)", () => {
   patchContainerBoxes({ user: "userCol", custom: "customCol" });
   const component = new UserMessageComponent("hello" as never);
